@@ -1,0 +1,117 @@
+"""참여사업 관리 — 월별 서류(급여명세서·이체확인증) 사전 점검 (규칙엔진, AI 미사용).
+
+기업이 매월 서류를 올리면 AI가 판독한 값(성명·귀속월·지급액·이체액 등)을 받아 그 달 기준으로 점검한다.
+판단(지급 가능 여부)은 하지 않고, 서로 다른 값·빠진 달·지침 기준 미달만 목록으로 알린다.
+신청 시기가 되면 이 결과가 담당자 확인 대시보드에 회차별로 모인다.
+
+기준: 2026년 청년일자리도약장려금 운영지침(주 소정근로 28시간 이상, 평균 월 급여 450만원 이하,
+      1회차 6개월 지급총액 2,700만원 이하), 최저임금법(연도별 최저임금).
+"""
+from datetime import date
+
+from labor import MIN_WAGE, monthly_hours
+
+MISMATCH, CHECK, MATCH = "불일치", "확인 필요", "일치"
+GUIDE = "2026 청년일자리도약장려금 지침"
+MAX_AVG = 4_500_000          # 평균 월 급여 상한
+FIRST_ROUND_MAX = 27_000_000  # 1회차(6개월) 지급총액 상한
+
+
+def _ym(s) -> str:
+    s = str(s or "").strip().replace(".", "-").replace("/", "-")
+    parts = [p for p in s.split("-") if p]
+    if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+        return f"{int(parts[0]):04d}-{int(parts[1]):02d}"
+    return ""
+
+
+def _won(v) -> int | None:
+    digits = "".join(ch for ch in str(v if v is not None else "") if ch.isdigit())
+    return int(digits) if digits else None
+
+
+def _name(v) -> str:
+    return "".join(str(v or "").split())
+
+
+def months_between(start_ym: str, end_ym: str) -> list[str]:
+    """start_ym ~ end_ym (둘 다 포함) 월 목록."""
+    y, m = map(int, start_ym.split("-"))
+    ey, em = map(int, end_ym.split("-"))
+    out = []
+    while (y, m) <= (ey, em) and len(out) < 60:
+        out.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
+    """한 달 서류 점검. ctx: {worker, hire_date, weekly_hours, history: [{ym, gross}] (이전 달까지 첨부분)}"""
+    items = []
+
+    def add(level, item, detail, basis=GUIDE):
+        items.append({"level": level, "item": item, "detail": detail, "basis": basis})
+
+    worker = _name(ctx.get("worker"))
+    p_name, t_name = _name(payslip.get("name")), _name(transfer.get("recipient"))
+    names = [n for n in (p_name, t_name) if n]
+    if not names:
+        add(CHECK, "성명", "서류에서 성명을 읽지 못함 — 원본 확인")
+    elif worker and any(n != worker for n in names):
+        add(MISMATCH, "성명", f"근로자 {ctx.get('worker')} / 명세서 {payslip.get('name') or '-'} / 이체 받는 분 {transfer.get('recipient') or '-'}")
+    elif p_name and t_name and p_name != t_name:
+        add(MISMATCH, "성명", f"명세서 {payslip.get('name')} ≠ 이체 받는 분 {transfer.get('recipient')}")
+    else:
+        add(MATCH, "성명", f"{payslip.get('name') or transfer.get('recipient')} — 명세서·이체확인증 일치")
+
+    p_ym = _ym(payslip.get("ym"))
+    add(MATCH if p_ym == month else MISMATCH if p_ym else CHECK, "귀속월",
+        f"명세서 귀속월 {p_ym or '판독 안 됨'}" + ("" if p_ym == month else f" — 첨부한 달은 {month}"))
+
+    net, amount = _won(payslip.get("net")), _won(transfer.get("amount"))
+    if net is None or amount is None:
+        add(CHECK, "실지급액·이체액", "금액을 읽지 못함 — 원본 확인")
+    elif net == amount:
+        add(MATCH, "실지급액·이체액", f"실지급 {net:,}원 = 이체 {amount:,}원")
+    else:
+        add(MISMATCH, "실지급액·이체액", f"실지급 {net:,}원 ≠ 이체 {amount:,}원 (차이 {abs(net - amount):,}원) — 분할 지급·정정 여부 확인")
+
+    t_date = str(transfer.get("date") or "")
+    if t_date and _ym(t_date) and _ym(t_date) < month:
+        add(CHECK, "이체일", f"이체일 {t_date}이 귀속월({month})보다 앞섬 — 선지급 여부 확인")
+
+    gross = _won(payslip.get("gross"))
+    year = int(month[:4])
+    rate, weekly = MIN_WAGE.get(year), float(ctx.get("weekly_hours") or 40)
+    if gross is None:
+        add(CHECK, "최저임금", "지급총액을 읽지 못함", "최저임금법 제6조")
+    elif not rate:
+        add(CHECK, "최저임금", f"{year}년 최저임금 미등록 — 고시 금액 확인", "최저임금법 제6조")
+    else:
+        need = rate * monthly_hours(weekly)
+        add(MATCH if gross >= need else MISMATCH, "최저임금",
+            f"지급총액 {gross:,}원 {'≥' if gross >= need else '<'} 월 환산 {need:,}원 (주 {weekly:g}시간, {year}년 {rate:,}원) — 산입범위는 원본으로 확인",
+            "최저임금법 제6조")
+
+    hist = [h for h in (ctx.get("history") or []) if _won(h.get("gross")) is not None and h.get("ym") != month]
+    grosses = [_won(h["gross"]) for h in hist] + ([gross] if gross is not None else [])
+    if grosses:
+        avg = sum(grosses) // len(grosses)
+        add(MATCH if avg <= MAX_AVG else MISMATCH, "평균 월 급여 상한", f"지금까지 {len(grosses)}개월 평균 {avg:,}원 (상한 {MAX_AVG:,}원)")
+        if len(grosses) <= 6:
+            total = sum(grosses)
+            add(MATCH if total <= FIRST_ROUND_MAX else MISMATCH, "1회차 지급총액",
+                f"{len(grosses)}개월 누적 {total:,}원 (1회차 6개월 상한 {FIRST_ROUND_MAX:,}원)")
+
+    worst = MISMATCH if any(i["level"] == MISMATCH for i in items) else CHECK if any(i["level"] == CHECK for i in items) else MATCH
+    return {"month": month, "level": worst, "items": items}
+
+
+def missing_months(hire_date: str, uploaded: list[str], today: date | None = None) -> list[str]:
+    """입사월부터 지난달까지 중 서류가 없는 달 (급여 지급 전인 이번 달은 제외)."""
+    today = today or date.today()
+    last = f"{today.year - 1:04d}-12" if today.month == 1 else f"{today.year:04d}-{today.month - 1:02d}"
+    start = _ym(hire_date)
+    if not start or start > last:
+        return []
+    return [m for m in months_between(start, last) if m not in set(uploaded)]
