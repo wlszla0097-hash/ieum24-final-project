@@ -4,7 +4,7 @@
 > 기업은 면접 전에 **'지원제도 활용 가능' 표시**를 본인 동의 하에 확인하며,
 > 채용 후에는 **매월 급여 서류를 AI가 판독·점검**해 지원금 신청과 담당자 검토까지 이어지는 AI 고용서비스
 
-- **배포 URL**: (팀 배포 후 기재)
+- **배포 URL**: https://ieum24-final-project.vercel.app
 - **서비스 기획서**: [docs/service-plan.md](docs/service-plan.md)
 - **AI 코딩 도구 사용 기록**: [docs/ai-coding-log.md](docs/ai-coding-log.md)
 - **사전 검증 결과**: [tools/eval_result.md](tools/eval_result.md) (재현: `python3 tools/eval_mvp.py`)
