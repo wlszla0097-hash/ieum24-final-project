@@ -74,6 +74,7 @@ cp .env.example .env      # AI 키를 넣으면 AI 기능 동작, 비우면 규�
 python3 dev_server.py     # → http://127.0.0.1:3000
 python3 -m pytest -q tests
 python3 tools/eval_mvp.py # 사전 검증 지표 재측정
+python3 tools/check_synthetic.py # data/synthetic 합성데이터 자가 점검 (docs/data-spec.md)
 ```
 
 키 값은 `.env`(로컬)와 Vercel 환경 변수에만 넣고, 코드·채팅·스크린샷에 올리지 않습니다.

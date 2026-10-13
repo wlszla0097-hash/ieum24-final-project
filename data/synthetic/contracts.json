@@ -1,0 +1,9 @@
+[
+  {"id": "C-01", "worker": "김하늘", "busino": "0008100012", "employment_type": "정규직", "start_date": "2026-03-03", "end_date": "",
+   "wage_type": "월급", "base_wage": 2600000, "allowances": 0, "weekly_hours": 40, "daily_hours": 8, "break_minutes": 60,
+   "has_holiday": true, "has_leave": true, "has_place": true, "has_job": true, "has_payday": true, "expect": "적정", "note": "정상"},
+  {"id": "C-02", "worker": "정다온", "busino": "0008100023", "employment_type": "정규직", "start_date": "2026-05-11", "end_date": "",
+   "wage_type": "월급", "base_wage": 2000000, "allowances": 0, "weekly_hours": 40, "daily_hours": 8, "break_minutes": 30,
+   "has_holiday": true, "has_leave": true, "has_place": true, "has_job": true, "has_payday": false,
+   "expect": "위반 의심", "note": "최저임금 미달 + 휴게 30분 부족 + 임금 지급일 누락"}
+]

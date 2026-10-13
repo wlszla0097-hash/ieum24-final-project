@@ -12,6 +12,19 @@
 - 날짜는 `YYYY-MM-DD`(API 원형이 `YYYYMMDD`면 그 형식), 금액은 숫자만(원 단위, 쉼표 없음).
 - 파일은 `data/synthetic/` 아래에 둡니다. 작업은 브랜치(A: `seeker-data`, B: `company-data`)에서 하고 Pull Request로 올립니다.
 - 정상 사례만이 아니라 **점검에 걸려야 하는 오류 사례**도 섞습니다 (각 데이터의 "오류 사례" 참고). 사례마다 `note`에 의도를 적습니다.
+- `data/synthetic/`에 **예시 파일이 이미 들어 있습니다.** 복사해서 늘리는 방식으로 작업하세요.
+
+## 작업 → 점검 → 화면 확인 순서
+
+1. 예시 파일을 복사해 데이터를 늘립니다.
+2. **자가 점검**: `python3 tools/check_synthetic.py`
+   - 항목 빠짐·사업자번호 규칙·파일 연결 오류를 알려 주고(✖ = 꼭 고칠 것),
+   - 일부러 넣은 오류 사례를 서비스 점검 기능이 실제로 잡는지 ✅/❌ 로 보여 줍니다(`expect`에 적은 기대 결과와 비교).
+3. **화면 확인**: `python3 dev_server.py` → http://127.0.0.1:3000
+   - 구직자 화면 '예시 불러오기'에 `seekers.json`의 구직자가, 기업 화면 예시 목록에 `work24_postings.xml`의 공고가 추가됩니다.
+   - 공고에는 사업자번호로 기업 정보(피보험자 수·우선지원 여부)와 임금체불 조회 결과가 자동으로 붙습니다.
+   - 브랜치에 올리면 PR의 미리보기 주소에서도 같은 화면을 볼 수 있습니다.
+4. 자동 테스트(`python3 -m pytest -q tests`)는 내장 데이터 기준으로 돌아가므로, 합성 파일을 바꿔도 깨지지 않습니다.
 
 ## 1. 공공데이터 활용 명세
 
@@ -131,10 +144,12 @@
     "wage_type": "월급", "base_wage": 2600000, "allowances": 0,
     "weekly_hours": 40, "daily_hours": 8, "break_minutes": 60,
     "has_holiday": true, "has_leave": true, "has_place": true, "has_job": true, "has_payday": true,
-    "note": "정상"
+    "expect": "적정", "note": "정상"
   }
 ]
 ```
+
+`expect`: 기대하는 점검 결과 — `적정` / `확인 필요` / `위반 의심`.
 
 **오류 사례 각 1건 이상**: 최저임금 미달, 휴게시간 부족(8시간에 30분), 주 40시간 초과, 필수 기재사항 누락(`has_*` 중 하나 false), 기간제인데 `end_date` 없음.
 
@@ -142,11 +157,13 @@
 
 - 이미지(`.png`/`.jpg`)로 만듭니다. 양식 2~3종(기업·은행마다 배치가 다르게). 현재 생성기: `js/claimdocs.js`.
 - 이미지마다 **정답값**을 `docs_answer.json`에 적습니다. AI 판독 결과와 비교하는 기준입니다.
+- 같은 달 명세서와 이체확인증은 같은 `case` 값으로 묶고, `expect`에 기대 결과(`일치` / `확인 필요` / `불일치`)를 적습니다.
+- 이미지는 `data/synthetic/docs/`에 둡니다. 기업 화면의 월별 서류 점검에 직접 올려 AI 판독을 시험할 수 있습니다(배포 환경에 AI 키 필요).
 
 ```json
 [
-  {"file": "payslip_A_2026-07.png", "kind": "payslip", "name": "김하늘", "ym": "2026-07", "gross": 2600000, "net": 2301000, "pay_date": "2026-08-10", "note": "정상"},
-  {"file": "transfer_A_2026-07.png", "kind": "transfer", "recipient": "김하늘", "date": "2026-08-10", "amount": 2271000, "note": "실지급액과 3만원 차이(불일치 사례)"}
+  {"case": "A-2026-08", "file": "docs/payslip_A_2026-08.png", "kind": "payslip", "name": "김하늘", "ym": "2026-08", "gross": 2600000, "net": 2301000, "pay_date": "2026-09-10", "expect": "불일치", "note": "실지급액과 이체액 3만원 차이"},
+  {"case": "A-2026-08", "file": "docs/transfer_A_2026-08.png", "kind": "transfer", "recipient": "김하늘", "date": "2026-09-10", "amount": 2271000, "expect": "불일치", "note": "실지급액과 이체액 3만원 차이"}
 ]
 ```
 

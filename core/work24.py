@@ -14,27 +14,16 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from datafiles import parse_wanted
 from synthetic import POSTINGS
 
 BASE = os.environ.get("WORK24_BASE_URL") or "https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do"
 CACHE_SECONDS = 3600
 _cache: dict = {"at": 0.0, "items": None, "source": None}
-REGULAR_CODES = {"10", "11"}  # 고용형태 코드: 기간의 정함이 없는 근로계약(시간선택제 포함)
 
 
 def _parse(xml_bytes: bytes) -> list[dict]:
-    root = ET.fromstring(xml_bytes)
-    out = []
-    for w in root.iter("wanted"):
-        g = lambda tag: (w.findtext(tag) or "").strip()  # noqa: E731
-        sal = "".join(ch for ch in g("sal").split("~")[0] if ch.isdigit())
-        out.append({"id": "W24-" + g("wantedAuthNo"), "company": g("company"), "region": g("region"), "title": g("title"),
-                    "job": g("jobsNm") or g("title"), "emp_type": "정규직" if g("empTpCd") in REGULAR_CODES else ("계약직" if g("empTpCd") else None),
-                    "wage": int(sal) * (10000 if len(sal) <= 4 else 1) if sal and g("salTpNm") == "월급" else None,
-                    "weekly_hours": None, "insured": None, "priority": None, "arrears": None,
-                    "skills": [s for s in g("title").replace("/", " ").split() if len(s) > 1][:6],
-                    "close": g("closeDt"), "url": g("wantedInfoUrl"), "source": "live"})
-    return [o for o in out if o["id"] != "W24-"]
+    return parse_wanted(xml_bytes, source="live")
 
 
 def load_postings(keyword: str = "") -> tuple[list[dict], str]:

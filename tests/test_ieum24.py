@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+os.environ["IEUM_BUILTIN_ONLY"] = "1"  # data/synthetic 파일과 무관하게 내장 합성데이터로 검증
 from datetime import date
 from pathlib import Path
 

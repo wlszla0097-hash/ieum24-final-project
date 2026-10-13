@@ -1,0 +1,6 @@
+[
+  {"case": "A-2026-07", "file": "docs/payslip_A_2026-07.png", "kind": "payslip", "name": "김하늘", "ym": "2026-07", "gross": 2600000, "net": 2301000, "pay_date": "2026-08-10", "expect": "일치", "note": "정상"},
+  {"case": "A-2026-07", "file": "docs/transfer_A_2026-07.png", "kind": "transfer", "recipient": "김하늘", "date": "2026-08-10", "amount": 2301000, "expect": "일치", "note": "정상"},
+  {"case": "A-2026-08", "file": "docs/payslip_A_2026-08.png", "kind": "payslip", "name": "김하늘", "ym": "2026-08", "gross": 2600000, "net": 2301000, "pay_date": "2026-09-10", "expect": "불일치", "note": "실지급액과 이체액 3만원 차이"},
+  {"case": "A-2026-08", "file": "docs/transfer_A_2026-08.png", "kind": "transfer", "recipient": "김하늘", "date": "2026-09-10", "amount": 2271000, "expect": "불일치", "note": "실지급액과 이체액 3만원 차이"}
+]

@@ -4,7 +4,7 @@
   "functions": {
     "api/*.py": {
       "maxDuration": 60,
-      "includeFiles": "core/**",
+      "includeFiles": "{core/**,data/**}",
       "excludeFiles": "{tests/**,docs/**,dev_server.py}"
     }
   }

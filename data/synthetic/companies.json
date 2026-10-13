@@ -1,0 +1,6 @@
+[
+  {"busino": "0008100012", "company": "한빛소프트랩(가상)", "indTpNm": "소프트웨어 개발 및 공급업", "region": "서울 마포구",
+   "insured": 18, "priority": true, "weekly_hours": 40, "note": "수도권·우선지원대상기업·정상"},
+  {"busino": "0008100023", "company": "가온물산(가상)", "indTpNm": "도매 및 상품 중개업", "region": "경북 구미시",
+   "insured": 4, "priority": true, "weekly_hours": 40, "note": "비수도권·피보험자 5인 미만(확인 필요)·임금체불 조회 실패·공고 월급 최저임금 미달"}
+]

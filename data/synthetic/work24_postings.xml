@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 예시 2건 (docs/data-spec.md 연번 1). 복사해서 20건까지 늘려 주세요. -->
+<wantedRoot>
+  <total>2</total><startPage>1</startPage><display>2</display>
+  <wanted>
+    <wantedAuthNo>K000000001</wantedAuthNo>
+    <company>한빛소프트랩(가상)</company>
+    <busino>0008100012</busino>
+    <indTpNm>소프트웨어 개발 및 공급업</indTpNm>
+    <title>웹 프론트엔드 개발자 신입 JavaScript React</title>
+    <salTpNm>월급</salTpNm>
+    <sal>280만원 ~ 300만원</sal>
+    <minSal>2800000</minSal>
+    <maxSal>3000000</maxSal>
+    <region>서울 마포구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>04000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>서울특별시 마포구 가상로 1</basicAddr>
+    <detailAddr>2층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>133100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000002</wantedAuthNo>
+    <company>가온물산(가상)</company>
+    <busino>0008100023</busino>
+    <indTpNm>도매 및 상품 중개업</indTpNm>
+    <title>물류 사무원 재고 입출고 엑셀</title>
+    <salTpNm>월급</salTpNm>
+    <sal>200만원</sal>
+    <minSal>2000000</minSal>
+    <maxSal>2000000</maxSal>
+    <region>경북 구미시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>고졸</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261005</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>39000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>경상북도 구미시 가상로 2</basicAddr>
+    <detailAddr>물류센터</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>312100</jobsCd>
+    <smodifyDtm>202610050900</smodifyDtm>
+  </wanted>
+</wantedRoot>

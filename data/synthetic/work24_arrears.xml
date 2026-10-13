@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 예시 2건 (docs/data-spec.md 연번 2). companies.json 의 모든 busino 에 대해 1건씩 만들어 주세요. -->
+<root>
+  <jdgnList>
+    <lnkReqNo>1</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100012</brno><bzmn>00000000001</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>2</lnkReqNo><lnkSucsYn>N</lnkSucsYn><brno>0008100023</brno><bzmn></bzmn>
+    <judgReltYn></judgReltYn><errMsgCd>ERR0011</errMsgCd><errMsg>사업장 정보 없음</errMsg>
+  </jdgnList>
+</root>

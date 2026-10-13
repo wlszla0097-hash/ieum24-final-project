@@ -120,3 +120,23 @@ def persona(pid: str) -> dict | None:
 
 def posting(jid: str) -> dict | None:
     return next((p for p in POSTINGS if p["id"] == jid), None)
+
+
+# ── data/synthetic/ 파일 데이터 추가 (docs/data-spec.md 형식) ──
+# 팀원이 만든 합성데이터 파일이 있으면 내장 데이터 뒤에 붙인다. 파일 형식 오류가 있어도 서비스는 내장 데이터로 계속 동작한다.
+def _load_files():
+    import os
+    if os.environ.get("IEUM_BUILTIN_ONLY") == "1":  # 자동 테스트·검증 지표는 내장 데이터 기준으로 고정
+        return
+    try:
+        from datafiles import load_postings, load_seekers
+        ids = {p["id"] for p in PERSONAS}
+        PERSONAS.extend(p for p in load_seekers() if p["id"] not in ids)
+        jids = {p["id"] for p in POSTINGS}
+        POSTINGS.extend(p for p in load_postings() if p["id"] not in jids)
+    except Exception as e:  # noqa: BLE001
+        print("[synthetic] data/synthetic 파일을 읽지 못해 내장 데이터만 사용:", repr(e))
+
+
+_load_files()
+
