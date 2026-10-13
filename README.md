@@ -6,6 +6,7 @@
 
 - **배포 URL**: https://ieum24-final-project.vercel.app
 - **서비스 기획서**: [docs/service-plan.md](docs/service-plan.md)
+- **공공데이터 활용 명세 · 합성데이터 작성 기준**: [docs/data-spec.md](docs/data-spec.md)
 - **AI 코딩 도구 사용 기록**: [docs/ai-coding-log.md](docs/ai-coding-log.md)
 - **사전 검증 결과**: [tools/eval_result.md](tools/eval_result.md) (재현: `python3 tools/eval_mvp.py`)
 - 모든 인물·공고·지원자·서류는 **합성(모의) 데이터**입니다. 실제 개인정보는 사용하지 않습니다.
