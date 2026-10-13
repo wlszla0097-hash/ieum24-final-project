@@ -198,7 +198,7 @@ def test_employer_sees_points_with_program_names_hidden():
 
 
 def test_mvp_eval_targets():
-    """기획안 'MVP 검증 지표'를 합성데이터로 측정 (tools/eval_mvp.py) — 목표 미달이면 실패."""
+    """서비스 기획서의 검증 지표를 합성데이터로 측정 (tools/eval_mvp.py) — 목표 미달이면 실패."""
     import runpy
     g = runpy.run_path(str(Path(__file__).resolve().parent.parent / "tools" / "eval_mvp.py"))
     assert g["badge_acc"] >= 98 and g["detect"] >= 95

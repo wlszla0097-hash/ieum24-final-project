@@ -1,4 +1,4 @@
-"""이음24 MVP 사전 검증 (합성데이터) — 기획안 'MVP 검증 지표'를 실제 코드로 측정한다. AI 호출 없음(토큰 0).
+"""이음24 MVP 사전 검증 (합성데이터) — 서비스 기획서의 검증 지표를 실제 코드로 측정한다. AI 호출 없음(토큰 0).
 
 실행: python3 tools/eval_mvp.py   → 결과를 표준출력과 tools/eval_result.md 로 남긴다.
 
@@ -182,7 +182,7 @@ report = f"""# 이음24 MVP 사전 검증 결과 (합성데이터, {date.today()
 
 AI 호출 없이 규칙엔진·검증 코드만으로 측정. 재현: `python3 tools/eval_mvp.py`
 
-| 지표 | 목표(기획안) | 측정 결과 |
+| 지표 | 목표(기획서) | 측정 결과 |
 |---|---|---|
 | 배지 판정 일치율 (지침 정답표 대비) | 98% 이상 | **{badge_acc:.1f}%** ({badge_total - len(wrong)}/{badge_total}건) |
 | 동의 철회 시 배지 노출 | 0건 | **{consent_off_badges}건** |
