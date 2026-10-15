@@ -357,6 +357,8 @@ async function loadCases() {
   }
 }
 function caseCard(c) {
+  const unsigned = c.contract_id && c.contract_status !== "체결 완료";  // 근로자 서명 전 계약서는 '검토 대기'가 될 수 없음
+  if (unsigned && c.status === "검토 대기") c = { ...c, status: "확인 필요" };
   const tone = { "검토 대기": "적정", "확인 필요": "확인필요", "보완 필요": "위반의심" }[c.status];
   const s = c.schedule;
   const saved = c.contract_id ? `<div class="docs-in-case"><h4>채용 단계에서 저장된 서류 — 다시 요청하지 않습니다</h4>
@@ -374,7 +376,9 @@ function caseCard(c) {
         <h4>신청 시기</h4>
         <p>고용유지 ${esc(s.months_kept)}개월 · 6개월 시점 ${esc(s.six_month_date)} · <b>${esc(s.state)}</b></p>
       </div>
-      <div><h4>확인 항목</h4>${checkList(c.checklist)}</div>
+      <div><h4>확인 항목</h4>${checkList(unsigned
+        ? [...c.checklist, { level: "확인 필요", item: "근로계약서 서명", detail: "근로자 서명 대기 — 체결(양측 서명) 전 계약서", basis: "근로기준법 제17조 (근로조건 명시·교부)" }]
+        : c.checklist)}</div>
     </div>
     ${saved}
     ${c.hiredocs && window.IeumHireDocs ? `<div class="docs-in-case">${window.IeumHireDocs.block(c.hiredocs)}</div>` : ""}

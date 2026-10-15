@@ -454,7 +454,12 @@ async function showCtResult() {
 }
 
 /* ================= 급여명세서 발급 · 이체 확인 ================= */
-function payMonths() { const s = String(E.ct.fields.start_date).slice(0, 7); return Array.from({ length: 6 }, (_, i) => ymAdd(s, i)); }
+/** 급여 달: 입사월부터 6개월. 기간제는 계약 종료월까지만 (종료 뒤 명세서 발급 방지) */
+function payMonths() {
+  const f = E.ct.fields, s = String(f.start_date).slice(0, 7);
+  const end = f.kind === "기간" && f.end_date ? String(f.end_date).slice(0, 7) : "";
+  return Array.from({ length: 6 }, (_, i) => ymAdd(s, i)).filter((m) => !end || m <= end);
+}
 const psId = (ym) => `PS~${E.ct.id.slice(3)}~${ym}`;
 /* 이체확인증 예시: 가상 은행 양식으로 그려 '첨부'한 것처럼 쓰고, AI(또는 키가 없으면 그릴 때 기록한 값)로 판독해 대조 */
 const TR_CASES = {
@@ -493,6 +498,7 @@ async function openPay() {
   panel.innerHTML = `<h2 class="panel-title">⑦ 급여명세서 발급 · 이체확인증 대조 <small class="muted">${esc(f.worker)} · ${esc(ct.company)}</small></h2>
     <p class="muted">근로계약서 조건(월급 ${won(num(f.base_wage))}${num(f.allow_amount) ? ` + ${esc(f.allow_name || "고정수당")} ${won(num(f.allow_amount))}` : ""} · 매월 ${esc(f.payday)}일 지급)으로 임금명세서를 발급하면 근로자 [내 서류함]으로 바로 전송됩니다.
       이체확인증은 은행이 발급하는 서류라 기업이 <b>첨부</b>하면, AI가 <b>이체금액·보내는 분(이체자)·받는 분(예금주)·이체일</b>을 읽어 명세서·계약과 대조합니다. 파일은 저장하지 않고 판독값만 기록합니다.</p>
+    ${ct.worker_sign ? "" : '<p class="msg info">근로자 서명 전입니다. 실제 운영에서는 서명(계약 체결) 뒤에 급여명세서를 발급합니다. 담당자 신청 건에도 \'근로자 서명 대기\'로 표시됩니다.</p>'}
     <p class="meta">시연: [예시 선택]에서 사례를 고르면 가상 은행 양식의 이체확인증 이미지가 만들어져 첨부됩니다. 직접 만든 이미지·PDF도 [내 파일 첨부]로 올릴 수 있어요(AI 키가 있어야 판독).</p>
     <div class="btn-row"><button class="btn primary" type="button" id="payAll">6개월분 발급 + 예시 이체확인증 대조 (시연)</button>
       <span class="muted">지급총액 ${won(gross)} · 4번째 달 금액 다름, 6번째 달 이체자 다름 사례가 섞여 있어요.</span></div>
