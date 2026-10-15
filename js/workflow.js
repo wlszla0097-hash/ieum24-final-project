@@ -27,13 +27,15 @@ async function saveSeeker() {
 async function extraPostings() {
   try { return (await S.list("postings")).slice(0, 30).map((p) => ({ id: p.id, form: p.form, skills: p.skills || [] })); } catch (e) { return []; }
 }
-async function apply(job) {
+/** 지원 저장. opts.portfolio: 이 공고에 맞춘 포트폴리오(맞춤 포트폴리오 기능이 넘겨 줌) — 있으면 기업 화면에 이것이 보인다 */
+async function apply(job, opts = {}) {
   if (!job) throw new Error("공고를 찾지 못했습니다. 다시 추천을 받아 주세요.");
   const me = S.me(), sk = await saveSeeker();
   if (!sk) throw new Error("먼저 [AI로 이력 정리 · 공고 추천]으로 이력을 저장하세요.");
   const id = `${job.id}~${me}`, old = await S.get("applications", id);
   return S.put("applications", id, { ...(old || {}), posting_id: job.id, busino: job.busino || "", company: job.company, title: job.title,
-    seeker_id: me, alias: sk.alias, applied: (old && old.applied) || today(), status: (old && old.status) || "지원" });
+    seeker_id: me, alias: sk.alias, applied: (old && old.applied) || today(), status: (old && old.status) || "지원",
+    portfolio: opts.portfolio || (old && old.portfolio) || "" });
 }
 async function markApplied() {
   const mine = (await S.list("applications").catch(() => [])).filter((a) => a.seeker_id === S.me());
@@ -295,7 +297,7 @@ async function loadDetail() {
     const skMap = Object.fromEntries(seekers.map((x) => [x.id, x]));
     const extra = apps.filter((a) => a.posting_id === p.id && skMap[a.seeker_id]).map((a) => { const sk = skMap[a.seeker_id];
       return { seeker_id: a.seeker_id, alias: sk.alias || a.alias, applied: a.applied, headline: sk.headline,
-        profile: { ...sk.profile, points: sk.points || [], portfolio: sk.portfolio || "" } }; });
+        profile: { ...sk.profile, points: sk.points || [], portfolio: a.portfolio || sk.portfolio || "" } }; });  // 공고별 맞춤 포트폴리오 우선
     const data = await api("/api/employer", { method: "POST", timeoutMs: 20000,
       body: { posting: p.form, posting_id: p.id, analyze: false, skills: p.skills || [], applicants_extra: extra } });
     E.view = { p, data, extra };

@@ -5,6 +5,7 @@
 > 채용 후에는 **매월 급여 서류를 AI가 판독·점검**해 지원금 신청과 담당자 검토까지 이어지는 AI 고용서비스
 
 - **배포 URL**: https://ieum24-final-project.vercel.app
+- **시연·테스트 방법(최신)**: [docs/demo-guide.md](docs/demo-guide.md)
 - **서비스 기획서**: [docs/service-plan.md](docs/service-plan.md)
 - **공공데이터 활용 명세 · 합성데이터 작성 기준**: [docs/data-spec.md](docs/data-spec.md)
 - **AI 서류 판독 방식(발표용)**: [docs/ai-document-reading.md](docs/ai-document-reading.md)
