@@ -102,6 +102,8 @@ _APPLICANT_TEMPLATES = [
      "programs": [{"type": "국민취업지원제도", "qualified": "2026-03-02", "iap": "2026-03-16", "status": "참여 중"}], "insurance": []},
 ]
 _APPLIED = ["2026-10-02", "2026-10-05", "2026-10-07"]
+# 채용 확정 후 근로계약서에 들어가는 가상 성명 (채용 전 기업 화면에는 '지원자 A'로만 보인다)
+SYN_NAMES = {"A": "강민서", "B": "윤도현", "C": "임하은"}
 
 
 def applicants_for(posting: dict) -> list[dict]:
@@ -110,8 +112,13 @@ def applicants_for(posting: dict) -> list[dict]:
         out.append({"id": f"{posting['id']}-{t['suffix']}", "alias": f"지원자 {t['suffix']}", "age": t["age"], "consent": t["consent"],
                     "headline": t["headline"].format(job=posting["job"]), "programs": t["programs"], "insurance": t["insurance"],
                     "points": [x.format(job=posting["job"]) for x in t["points"]], "portfolio": "",
-                    "applied": _APPLIED[i]})
+                    "applied": _APPLIED[i], "name": SYN_NAMES[t["suffix"]]})
     return out
+
+
+def company_key(name: str) -> str:
+    """회사명 비교용: 공백·'(가상)' 표기를 뺀다."""
+    return str(name or "").replace("(가상)", "").replace(" ", "")
 
 
 def persona(pid: str) -> dict | None:
@@ -132,8 +139,13 @@ def _load_files():
         from datafiles import load_postings, load_seekers
         ids = {p["id"] for p in PERSONAS}
         PERSONAS.extend(p for p in load_seekers() if p["id"] not in ids)
+        files = load_postings()
+        if files:
+            # 같은 회사가 파일 데이터(사업자번호 연결)에 있으면 내장 예시 공고는 빼서 한 회사 = 한 기업 정보로 맞춘다
+            names = {company_key(p["company"]) for p in files}
+            POSTINGS[:] = [p for p in POSTINGS if company_key(p["company"]) not in names]
         jids = {p["id"] for p in POSTINGS}
-        POSTINGS.extend(p for p in load_postings() if p["id"] not in jids)
+        POSTINGS.extend(p for p in files if p["id"] not in jids)
     except Exception as e:  # noqa: BLE001
         print("[synthetic] data/synthetic 파일을 읽지 못해 내장 데이터만 사용:", repr(e))
 

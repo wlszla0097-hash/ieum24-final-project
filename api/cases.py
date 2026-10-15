@@ -1,6 +1,7 @@
 """채용 확정 → 신청 건(담당자 확인 대시보드용).
 
-POST /api/cases {"posting": {...공고 입력}, "applicant_id", "hire_date", "contract": {...근로조건}, "my_application": {"profile": {...}}}
+POST /api/cases {"posting": {...공고 입력}, "posting_id", "applicant_id", "hire_date", "contract": {...근로조건},
+                 "applicant": {"alias", "profile": {...}} (저장된 구직자), "as_of": "YYYY-MM-DD" (시연: 이 날짜 기준으로 고용유지 계산)}
 GET  /api/cases 시연용 신청 건 목록
 
 - 근로계약 조건은 규칙엔진(labor.py)으로 점검하고, 공고 점검 항목·고용유지 기간·신청 가능일을 함께 정리한다.
@@ -24,7 +25,10 @@ CONTRACT_KEYS = ("employment_type", "wage_type", "start_date", "end_date", "base
 HAS_KEYS = ("has_holiday", "has_leave", "has_place", "has_job", "has_payday")
 
 
-def resolve_applicant(post: dict, aid: str, mine: dict | None) -> dict | None:
+def resolve_applicant(post: dict, aid: str, mine: dict | None, given: dict | None = None) -> dict | None:
+    if isinstance(given, dict) and isinstance(given.get("profile"), dict):  # 구직자 화면에서 저장된 지원자
+        me = parse_seeker(given["profile"])
+        return {**me, "id": aid, "alias": text(given.get("alias"), 20) or "지원자"}
     if aid.endswith("-ME"):
         if not isinstance(mine, dict) or not isinstance(mine.get("profile"), dict):
             return None
@@ -131,11 +135,17 @@ class handler(JsonHandler):
         if not isinstance(b.get("posting"), dict):
             raise ApiError(400, "missing_input", "공고를 먼저 점검하세요.")
         post = parse_posting(b["posting"])
-        app = resolve_applicant(post, text(b.get("applicant_id"), 20), b.get("my_application"))
+        if b.get("posting_id"):
+            post["id"] = text(b["posting_id"], 40)
+        app = resolve_applicant(post, text(b.get("applicant_id"), 80), b.get("my_application"), b.get("applicant"))
         if not app:
             raise ApiError(400, "missing_input", "채용할 지원자를 선택하세요.")
         hire = d(b.get("hire_date"))
         if not hire:
             raise ApiError(400, "missing_input", "채용일(입사일)을 입력하세요.")
         contract = b.get("contract") if isinstance(b.get("contract"), dict) else None
-        return {"ok": True, "case": build_case(post, app, hire, contract)}
+        as_of = d(b.get("as_of"))  # 시연: 급여 6개월분을 미리 발급해 본 경우 그 시점 기준으로 계산
+        case = build_case(post, app, hire, contract, today=as_of)
+        if as_of:
+            case["as_of"] = as_of.isoformat()
+        return {"ok": True, "case": case}

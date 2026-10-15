@@ -169,9 +169,9 @@ async function runAll() {
   b.disabled = false;
 }
 
-window.IeumDocs = {
+window.IeumDocs = { drawTransfer, b64, fileToB64, ymAdd,
   open, setOnSend: (fn) => (S.onSend = fn),
-  init() { const b = $("#docsAll"); if (b) b.onclick = runAll; },
+  init() { const b = $("#docsAll"); if (b) b.onclick = runAll; }, // 기존 6개월 일괄 점검 패널(있을 때만)
   docsBlock(d) { // 담당자 확인 대시보드용
     if (!d) return "";
     const lv = (l) => (l === "미첨부" ? '<span class="badge 안내">미첨부</span>' : badge(l));

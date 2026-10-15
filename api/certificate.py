@@ -20,7 +20,7 @@ from datetime import date
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "core"))  # 공용 모듈 위치
 
 from ai import generate_json, model_name, provider  # noqa: E402
-from common import ApiError, JsonHandler, text  # noqa: E402
+from common import ApiError, JsonHandler, rate_limited, text  # noqa: E402
 from claimdocs import check_month  # noqa: E402
 from rules import d  # noqa: E402
 
@@ -96,8 +96,11 @@ def claimdoc(body: dict) -> dict:
     if len(month) != 7 or month[4] != "-":
         raise ApiError(400, "invalid_input", "귀속월을 확인하세요.")
     files = body.get("files") if isinstance(body.get("files"), list) else []
+    # 이음24에서 발급한 급여명세서는 값을 이미 알고 있으므로 다시 읽지 않는다 → 이체확인증 1장만 판독
+    issued = body.get("issued_payslip") if isinstance(body.get("issued_payslip"), dict) else None
+    need = 1 if issued else 2
     clean = []
-    for f in files[:2]:
+    for f in files[:need]:
         mt, data = text((f or {}).get("media_type"), 40), str((f or {}).get("data") or "")
         if mt not in TYPES:
             raise ApiError(400, "invalid_input", "PNG·JPG·WEBP 이미지 또는 PDF 파일만 올릴 수 있습니다.")
@@ -108,22 +111,24 @@ def claimdoc(body: dict) -> dict:
         if not size or size > MAX_FILE:
             raise ApiError(413, "too_large", "파일이 너무 큽니다. 두 장 합쳐 3MB 이하로 올려 주세요.")
         clean.append({"media_type": mt, "data": data})
-    if len(clean) != 2:
-        raise ApiError(400, "missing_input", "급여명세서와 이체확인증을 함께 올려 주세요.")
+    if len(clean) != need:
+        raise ApiError(400, "missing_input", "이체확인증을 올려 주세요." if issued else "급여명세서와 이체확인증을 함께 올려 주세요.")
     truth = body.get("sample_truth") if isinstance(body.get("sample_truth"), dict) else None
     if provider():
-        ai = generate_json(CLAIM_SYSTEM, f"{month} 귀속분 서류입니다. 판독해 JSON으로 답하세요.", max_tokens=400, file=clean)
+        ask = (f"{month} 귀속분 이체확인증 1장만 첨부했습니다(급여명세서 없음). payslip은 모두 빈 문자열로 두고 transfer만 판독해 JSON으로 답하세요."
+               if issued else f"{month} 귀속분 서류입니다. 판독해 JSON으로 답하세요.")
+        ai = generate_json(CLAIM_SYSTEM, ask, max_tokens=400, file=clean)
         source, model = "ai", model_name()
     elif truth:
         ai, source, model = truth, "synthetic_truth", None
     else:
         raise ApiError(503, "ai_not_configured", "AI 기능이 설정되지 않아 서류를 판독할 수 없습니다.")
-    ps = {k: text((ai.get("payslip") or {}).get(k), 40) for k in PAYSLIP_KEYS}
+    ps = {k: text(((issued if issued else ai.get("payslip")) or {}).get(k), 40) for k in PAYSLIP_KEYS}
     tr = {k: text((ai.get("transfer") or {}).get(k), 40) for k in TRANSFER_KEYS}
     ctx = body.get("ctx") if isinstance(body.get("ctx"), dict) else {}
     ctx = {"worker": text(ctx.get("worker"), 20), "hire_date": text(ctx.get("hire_date"), 10), "weekly_hours": ctx.get("weekly_hours") or 40,
            "history": [{"ym": text(h.get("ym"), 7), "gross": h.get("gross")} for h in (ctx.get("history") or [])[:24] if isinstance(h, dict)]}
-    return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "source": source, "model": model,
+    return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "source": source, "model": model, "payslip_source": "issued" if issued else source,
             "check": check_month(month, ps, tr, ctx),
             "note": "판독값은 원본과 대조해 확인하세요. 지급 가능 여부는 판정하지 않습니다. 파일은 저장하지 않습니다."}
 
@@ -245,3 +250,9 @@ class handler(JsonHandler):
         body = self.read_json(max_body=4_600_000)  # Vercel 요청 한도 4.5MB
         kind = body.get("kind")
         return claimdoc(body) if kind == "claimdoc" else hiredoc(body) if kind == "hiredoc" else read(body)
+
+    def do_POST(self):
+        # 월별 급여 6개월분을 한 번에 대조하는 시연을 위해 1분 20회까지 (다른 AI API는 1분 10회)
+        if rate_limited(f"{self._client_ip()}:certificate", limit=20):
+            return self._send(429, {"ok": False, "error": "rate_limited", "message": "요청이 너무 많습니다. 1분 후 다시 시도하세요."})
+        self._run(self.handle_post)

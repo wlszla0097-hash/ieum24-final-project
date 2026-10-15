@@ -112,7 +112,7 @@ class JsonHandler(BaseHTTPRequestHandler):
         self._run(self.handle_get)
 
     def do_POST(self):
-        if rate_limited(self._client_ip()):
+        if rate_limited(f"{self._client_ip()}:{type(self).__module__}"):  # API마다 따로 센다 (Vercel 함수별 제한과 같게)
             return self._send(429, {"ok": False, "error": "rate_limited", "message": "요청이 너무 많습니다. 1분 후 다시 시도하세요."})
         self._run(self.handle_post)
 

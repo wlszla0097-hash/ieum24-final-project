@@ -1,8 +1,10 @@
 """기업 화면 — 직접 쓴 공고 → 규칙 점검 + AI 정리, 지원자 목록(표시 여부만).
 
-GET  /api/employer   예시 공고 입력값 목록
-POST /api/employer   {"posting": {...공고 입력}, "my_application": {"profile": {...구직자 입력}}}
-                     → 공고 점검(규칙) + AI 공고 정리(요약·요구 역량·개선 제안) + 지원자 목록
+GET  /api/employer   예시 공고 입력값 목록 + 기업 목록(기업 선택 화면 — 추후 기업 로그인으로 대체)
+POST /api/employer   {"posting": {...공고 입력}, "posting_id", "analyze": true|false, "skills": [...],
+                      "applicants_extra": [{"seeker_id", "alias", "applied", "headline", "profile": {...구직자 입력}}]}
+                     → 공고 점검(규칙) + AI 공고 정리(요약·요구 역량·개선 제안, analyze=false면 생략·토큰 0) + 지원자 목록
+                     applicants_extra = 구직자 화면에서 [지원하기]로 저장된 지원자 (저장소에서 화면이 읽어 보냄)
 
 차별 방지 설계
 - 기업에게는 지원자별 '지원제도 활용 가능' 표시 여부(true/false)만 보낸다. 사유(참여 사업)·연령은 응답에 넣지 않는다.
@@ -14,12 +16,15 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "core"))  # 공용 모듈 위치
 
+from datetime import date  # noqa: E402
+
 from ai import generate_json, model_name, provider  # noqa: E402
 from common import ApiError, JsonHandler, text  # noqa: E402
 from match import guard  # noqa: E402
 from userinput import parse_posting, parse_seeker, posting_to_form, redact_programs, has_program_words  # noqa: E402
 from rules import judge, posting_check  # noqa: E402
-from synthetic import POSTINGS, applicants_for  # noqa: E402
+from synthetic import POSTINGS, applicants_for, company_key  # noqa: E402
+from datafiles import load_companies  # noqa: E402
 
 PUBLIC_FIELDS = ("id", "company", "region", "title", "job", "emp_type", "wage", "weekly_hours", "insured", "priority", "close", "skills")
 
@@ -40,7 +45,9 @@ def employer_view(applicant: dict, post: dict) -> dict:
     return {"id": applicant["id"], "alias": applicant["alias"], "headline": redact_programs(applicant["headline"]), "applied": applicant["applied"],
             "points": [x for x in applicant.get("points") or [] if not has_program_words(x)][:8],
             "portfolio": redact_programs(applicant.get("portfolio") or ""),
-            "badge": bool(j["badge"]), "is_me": applicant.get("is_me", False)}
+            "badge": bool(j["badge"]), "is_me": applicant.get("is_me", False),
+            "seeker_id": applicant.get("seeker_id"), "stored": bool(applicant.get("seeker_id")),
+            "hire_name": applicant.get("name") or applicant["alias"]}  # 채용 확정 후 계약서에 쓰는 이름
 
 
 def my_applicant(mine, post: dict) -> dict | None:
@@ -53,6 +60,40 @@ def my_applicant(mine, post: dict) -> dict | None:
         return None
     return {**me, "id": f"{post['id']}-ME", "alias": "지원자 (구직자 화면에서 작성)", "is_me": True, "applied": "2026-10-10",
             "headline": text(mine.get("headline"), 160) or f"{me['desire']['job']} 직무 희망"}
+
+
+def extra_applicants(items, post: dict) -> list[dict]:
+    """구직자 화면에서 [지원하기]로 저장된 지원자들. 배지 판단은 서버 규칙엔진이 다시 한다."""
+    out = []
+    for x in (items if isinstance(items, list) else [])[:30]:
+        if not isinstance(x, dict) or not isinstance(x.get("profile"), dict):
+            continue
+        try:
+            me = parse_seeker(x["profile"])
+        except ApiError:
+            continue
+        sid = text(x.get("seeker_id"), 40)
+        out.append({**me, "id": f"{post['id']}-S{sid}", "seeker_id": sid, "alias": text(x.get("alias"), 20) or "지원자",
+                    "applied": text(x.get("applied"), 10) or date.today().isoformat(),
+                    "headline": text(x.get("headline"), 160) or f"{me['desire']['job']} 직무 희망"})
+    return out
+
+
+def companies() -> list[dict]:
+    """기업 선택 화면: 합성 기업 정보(사업자번호 연결) + 그 회사 공고. 사업자번호 없는 내장 예시는 뒤에 둔다."""
+    comp, groups = load_companies(), {}
+    for p in POSTINGS:
+        b = p.get("busino") or ""
+        key = b or "N-" + company_key(p["company"])
+        if key not in groups:
+            info = comp.get(b) or {}
+            groups[key] = {"key": key, "busino": b, "company": info.get("company") or p["company"],
+                           "industry": info.get("indTpNm") or p.get("industry") or "", "region": info.get("region") or p["region"],
+                           "insured": info.get("insured", p.get("insured")), "priority": info.get("priority", p.get("priority")),
+                           "note": info.get("note") or "", "expect": info.get("expect") or "", "registered": bool(info), "postings": []}
+        groups[key]["postings"].append({"id": p["id"], "title": p["title"], "close": p.get("close") or "", "skills": p.get("skills") or [],
+                                        "form": posting_to_form(p), "source": p.get("source") or ""})
+    return sorted(groups.values(), key=lambda g: (not g["registered"], g["busino"] or g["key"]))
 
 
 def analyze(post: dict) -> tuple[dict | None, str | None]:
@@ -77,10 +118,17 @@ def build(body: dict) -> dict:
         post = parse_posting(body["posting"])
     else:
         raise ApiError(400, "missing_input", "공고 내용을 입력하세요.")
-    ai, ai_error = analyze(post)
+    if body.get("posting_id"):
+        post["id"] = text(body["posting_id"], 40)
+    if body.get("analyze") is False:  # 공고 확인 화면: 게시할 때 만든 정리를 다시 쓰고 AI를 부르지 않음
+        ai, ai_error = None, None
+        if isinstance(body.get("skills"), list):
+            post["skills"] = [text(x, 30) for x in body["skills"][:8] if text(x, 30)]
+    else:
+        ai, ai_error = analyze(post)
     if ai and ai["requirements"]:
         post["skills"] = ai["requirements"]  # 매칭에 쓰는 요구 기술 = 본문에 실제 있는 단어
-    apps = applicants_for(post)
+    apps = applicants_for(post) + extra_applicants(body.get("applicants_extra"), post)
     me = my_applicant(body.get("my_application"), post)
     if me:
         apps.append(me)
@@ -96,7 +144,7 @@ def build(body: dict) -> dict:
 class handler(JsonHandler):
     def handle_get(self):
         return {"ok": True, "examples": [{"id": p["id"], "label": f"{p['company']} — {p['title']} ({p['region']})", "form": posting_to_form(p)}
-                                         for p in POSTINGS]}
+                                         for p in POSTINGS], "companies": companies()}
 
     def handle_post(self):
         return build(self.read_json(max_body=60_000))

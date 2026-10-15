@@ -83,9 +83,11 @@
   <section id="seeker" class="page" data-page="seeker" hidden>
     <div class="wrap">
       <header class="page-head"><p class="eyebrow">① ② ③ 구직자 · AI 기능</p><h1>수료 후 취업 연계</h1><p>내 경험을 자유롭게 적으면 AI가 활동별로 정리하고, 직무 역량 문장·자기소개 초안을 만들어 실제 공고 목록 안에서 맞는 공고를 추천합니다.</p></header>
+      <div class="panel" id="myDocs" hidden></div>
       <div class="grid2">
         <form id="seekForm" class="panel" novalidate>
           <div class="example-bar"><span class="muted">처음이라면</span> <select id="seekExample" aria-label="예시 불러오기"><option value="">예시 불러오기…</option></select></div>
+          <div class="field"><label for="s_alias">이름 <small class="muted">(시연용 가명 — 지원서·근로계약서에 표시)</small></label><input id="s_alias" name="alias" maxlength="10" placeholder="예: 정다온"></div>
           <fieldset class="field"><legend>1. 참여한 고용서비스 <small class="muted">(해당하는 것 모두)</small></legend>
             <div class="prog-box">
               <label class="check"><input type="checkbox" id="kuchwi" name="kuchwi"> <b>국민취업지원제도</b></label>
@@ -166,7 +168,7 @@
           </div>
           <p class="msg" id="seekMsg" role="alert" hidden></p>
           <button class="btn primary block" id="seekBtn" type="submit">AI로 이력 정리 · 공고 추천</button>
-          <p class="fine">입력 내용은 저장되지 않습니다. 성명·연락처·주민번호 같은 개인정보는 적지 마세요. 참여 이력은 본인 입력값이며, 실제 서비스에서는 고용24 이력으로 확인합니다.</p>
+          <p class="fine">시연을 위해 입력 내용과 결과를 저장합니다(로그인 대신 이 브라우저 기준). 실제 이름·연락처·주민번호 같은 개인정보는 적지 마세요. 참여 이력은 본인 입력값이며, 실제 서비스에서는 고용24 이력으로 확인합니다.</p>
         </form>
         <div class="panel result" id="seekResult" aria-live="polite">
           <div class="empty"><span>🧭</span><p>왼쪽에 내 경험을 적고<br>[AI로 이력 정리 · 공고 추천]을 누르세요.</p></div>
@@ -178,76 +180,72 @@
   <!-- 3. 기업 -->
   <section id="employer" class="page" data-page="employer" hidden>
     <div class="wrap">
-      <header class="page-head"><p class="eyebrow">④ ⑤ ⑥ ⑦ 기업 · AI 기능</p><h1>공고 점검 · 지원자 확인 · 채용 확정</h1><p>우리 회사 공고를 입력하면 규칙엔진이 지원제도 연계 요건을 점검하고, AI가 공고를 정리해 요구 역량과 보완점을 알려 줍니다.</p></header>
-      <form id="postForm" class="panel" novalidate>
-        <div class="example-bar"><span class="muted">처음이라면</span> <select id="postExample" aria-label="예시 공고 불러오기"><option value="">예시 공고 불러오기…</option></select></div>
-        <div class="row3">
-          <div class="field"><label for="p_company">회사명 <small class="muted">(가명 가능)</small></label><input id="p_company" name="company" maxlength="40" placeholder="예: ○○정밀"></div>
-          <div class="field"><label for="p_sido">근무지 시·도 <em>*</em></label><select id="p_sido" name="sido"><option value="">선택</option><option>서울</option><option>경기</option><option>인천</option><option>부산</option><option>대구</option><option>광주</option><option>대전</option><option>울산</option><option>세종</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option></select></div>
-          <div class="field"><label for="p_sigungu">시·군·구</label><input id="p_sigungu" name="sigungu" maxlength="15" placeholder="예: 상주시"></div>
+      <header class="page-head"><p class="eyebrow">④ ⑤ ⑥ ⑦ 기업</p><h1>공고 올리기 · 지원자 확인 · 채용 확정</h1><p>회사를 고르면(추후 기업 로그인) 공고를 올리고, 지원자를 확인해 채용을 확정합니다. 채용 확정 시 저장된 구직자 정보로 근로계약서를 만들고, 계약 조건대로 급여명세서를 발급합니다.</p></header>
+      <div id="empCompanies">
+        <div class="panel">
+          <h2 class="panel-title">기업 선택 <small class="muted">— 시연용: 실제 서비스에서는 기업 로그인 화면입니다</small></h2>
+          <p class="src" id="storeMode"></p>
+          <div class="co-grid" id="coGrid"><div class="skeleton"></div></div>
+          <h3 class="top-gap">기본 예시 기업 <small class="muted">사업자번호 미등록 — 공공데이터 조회 없이 공고 입력값으로만 점검</small></h3>
+          <div class="co-grid" id="coGridEtc"></div>
+          <p class="meta">회사·공고·지원자·서류는 모두 합성(가상) 데이터입니다. 실제 개인정보를 입력하지 마세요. <button class="btn ghost sm" id="storeReset" type="button">시연 데이터 초기화</button></p>
         </div>
-        <div class="row3">
-          <div class="field"><label for="p_title">공고 제목 <em>*</em></label><input id="p_title" name="title" maxlength="60" placeholder="예: 품질관리 신입 사원"></div>
-          <div class="field"><label for="p_job">직무 <em>*</em></label><input id="p_job" name="job" maxlength="30" placeholder="예: 생산·품질"></div>
-          <div class="field"><label for="p_emp">고용형태 <em>*</em></label><select id="p_emp" name="emp_type"><option>정규직</option><option>계약직</option><option>기타</option></select></div>
-        </div>
-        <div class="row3">
-          <div class="field"><label for="p_wage">월 임금(원) <em>*</em></label><input inputmode="numeric" id="p_wage" name="wage" placeholder="예: 2,500,000"></div>
-          <div class="field"><label for="p_hours">주 소정근로시간</label><input inputmode="decimal" id="p_hours" name="weekly_hours" placeholder="40"></div>
-          <div class="field"><label for="p_insured">고용보험 피보험자 수</label><input inputmode="numeric" id="p_insured" name="insured" placeholder="예: 12"></div>
-        </div>
-        <div class="row3">
-          <div class="field"><label for="p_priority">우선지원대상기업</label><select id="p_priority" name="priority"><option>예</option><option>아니오</option><option selected>모름</option></select></div>
-          <div class="field"><label for="p_busino">사업자등록번호 <small class="muted">(공공데이터 조회 · 선택)</small></label><input id="p_busino" name="busino" maxlength="12" placeholder="예: 000-81-00012"></div>
-        </div>
-        <div class="field"><label for="p_desc">공고 본문 <small class="muted">(업무 내용·우대 기술·근무 조건 등 — AI가 정리)</small></label>
-          <textarea id="p_desc" name="description" rows="5" maxlength="1500" placeholder="예) 생산 제품의 치수 측정과 검사 기록을 담당합니다. 측정기 사용 경험, 엑셀 가능자 우대. 주 5일, 08:30~17:30."></textarea><span class="counter" data-for="p_desc">0/1500</span></div>
-        <p class="msg" id="postMsg" role="alert" hidden></p>
-        <button class="btn primary block" id="postBtn" type="submit">공고 점검 · AI 정리</button>
-      </form>
-      <div class="grid2 top-gap" id="empArea" hidden>
-        <div class="panel" id="postCheck"></div>
-        <div class="panel" id="applicants"></div>
       </div>
-      <div class="panel top-gap" id="hirePanel" hidden>
-        <h2 class="panel-title">⑥ 채용 확정 — 근로계약 점검 · 신청 알림</h2>
-        <p class="muted" id="hireWho"></p>
-        <div class="grid2">
-          <form id="checkForm" novalidate>
-            <div class="row2">
-              <div class="field"><label for="start_date">입사일(계약 시작일) <em>*</em></label><input type="date" id="start_date" name="start_date"></div>
-              <div class="field"><label for="employment_type">고용 형태</label><select id="employment_type" name="employment_type"><option>정규직</option><option>기간제</option><option>단시간</option></select></div>
-            </div>
-            <div class="row2">
-              <div class="field"><label for="base_wage">월 기본급(원) <em>*</em></label><input inputmode="numeric" id="base_wage" name="base_wage"></div>
-              <div class="field"><label for="allowances">고정수당 합계(원)</label><input inputmode="numeric" id="allowances" name="allowances" placeholder="0"></div>
-            </div>
-            <div class="row3">
-              <div class="field"><label for="weekly_hours">주 소정근로 <em>*</em></label><input inputmode="decimal" id="weekly_hours" name="weekly_hours"></div>
-              <div class="field"><label for="daily_hours">1일 소정근로</label><input inputmode="decimal" id="daily_hours" name="daily_hours"></div>
-              <div class="field"><label for="break_minutes">휴게(분)</label><input inputmode="numeric" id="break_minutes" name="break_minutes"></div>
-            </div>
-            <input type="hidden" id="wage_type" name="wage_type" value="월급"><input type="hidden" id="end_date" name="end_date" value="">
-            <fieldset class="field"><legend>계약서에 적혀 있나요?</legend>
-              <div class="chips">
-                <label><input type="checkbox" name="has_holiday" checked> 주휴일</label>
-                <label><input type="checkbox" name="has_leave" checked> 연차휴가</label>
-                <label><input type="checkbox" name="has_place" checked> 근무 장소</label>
-                <label><input type="checkbox" name="has_job" checked> 업무 내용</label>
-                <label><input type="checkbox" name="has_payday" checked> 지급일·방법</label>
+      <div id="empWork" hidden>
+        <div class="panel co-bar" id="coBar"></div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" type="button" data-etab="post">📝 공고 올리기</button>
+          <button class="tab" type="button" data-etab="list">📋 공고 확인 · 지원자</button>
+        </div>
+        <div data-epane="post">
+          <div class="grid-post">
+            <form id="postForm" class="panel" novalidate>
+              <div class="example-bar"><span class="muted">이 회사의 기존 공고로 채우기</span> <select id="postExample" aria-label="기존 공고 불러오기"><option value="">불러오기…</option></select></div>
+              <h3 class="form-sec">① 회사 정보 <small class="muted">기업 선택 시 자동 입력 · 사업자번호로 공공데이터(합성) 조회</small></h3>
+              <div class="row3">
+                <div class="field"><label for="p_company">회사명</label><input id="p_company" name="company" maxlength="40" placeholder="예: ○○정밀" readonly></div>
+                <div class="field"><label for="p_sido">근무지 시·도 <em>*</em></label><select id="p_sido" name="sido"><option value="">선택</option><option>서울</option><option>경기</option><option>인천</option><option>부산</option><option>대구</option><option>광주</option><option>대전</option><option>울산</option><option>세종</option><option>강원</option><option>충북</option><option>충남</option><option>전북</option><option>전남</option><option>경북</option><option>경남</option><option>제주</option></select></div>
+                <div class="field"><label for="p_sigungu">시·군·구</label><input id="p_sigungu" name="sigungu" maxlength="15" placeholder="예: 상주시"></div>
               </div>
-            </fieldset>
-            <p class="msg" id="checkMsg" role="alert" hidden></p>
-            <button class="btn primary block" id="checkBtn" type="submit">근로계약 점검 · 신청 건 만들기</button>
-            <button class="btn ghost block" id="sampleBtn" type="button">오류 있는 예시로 바꾸기</button>
-          </form>
-          <div class="result" id="checkResult" aria-live="polite">
-            <div class="empty"><span>📝</span><p>근로조건은 공고 내용으로 미리 채웠어요.<br>확인 후 [근로계약 점검]을 누르세요.</p></div>
+              <h3 class="form-sec">② 모집 내용·근로 조건</h3>
+              <div class="row3">
+                <div class="field"><label for="p_title">공고 제목 <em>*</em></label><input id="p_title" name="title" maxlength="60" placeholder="예: 품질관리 신입 사원"></div>
+                <div class="field"><label for="p_job">직무 <em>*</em></label><input id="p_job" name="job" maxlength="30" placeholder="예: 생산·품질"></div>
+                <div class="field"><label for="p_emp">고용형태 <em>*</em></label><select id="p_emp" name="emp_type"><option>정규직</option><option>계약직</option><option>기타</option></select></div>
+              </div>
+              <div class="row3">
+                <div class="field"><label for="p_wage">월 임금(원) <em>*</em></label><input inputmode="numeric" id="p_wage" name="wage" placeholder="예: 2,500,000"></div>
+                <div class="field"><label for="p_hours">주 소정근로시간</label><input inputmode="decimal" id="p_hours" name="weekly_hours" placeholder="40"></div>
+                <div class="field"><label for="p_insured">고용보험 피보험자 수</label><input inputmode="numeric" id="p_insured" name="insured" placeholder="예: 12"></div>
+              </div>
+              <div class="row3">
+                <div class="field"><label for="p_priority">우선지원대상기업</label><select id="p_priority" name="priority"><option>예</option><option>아니오</option><option selected>모름</option></select></div>
+                <div class="field"><label for="p_close">접수 마감일</label><input type="date" id="p_close" name="close"></div>
+                <div class="field"><label for="p_busino">사업자등록번호 <small class="muted">(공공데이터 조회 · 선택)</small></label><input id="p_busino" name="busino" maxlength="12" placeholder="예: 000-81-00012" readonly></div>
+              </div>
+              <h3 class="form-sec">③ 공고 본문 <small class="muted">구직자 추천·AI 정리에 쓰입니다</small></h3>
+              <div class="field"><label for="p_desc">공고 본문 <small class="muted">(업무 내용·우대 기술·근무 조건 등 — AI가 정리)</small></label>
+                <textarea id="p_desc" name="description" rows="5" maxlength="1500" placeholder="예) 생산 제품의 치수 측정과 검사 기록을 담당합니다. 측정기 사용 경험, 엑셀 가능자 우대. 주 5일, 08:30~17:30."></textarea><span class="counter" data-for="p_desc">0/1500</span></div>
+              <p class="msg" id="postMsg" role="alert" hidden></p>
+              <button class="btn primary block" id="postBtn" type="submit">공고 점검 · AI 정리 (게시 전 확인)</button>
+            </form>
+            <aside class="panel" id="postPreviewBox"><h3>👀 구직자 추천 목록에 보일 모습</h3><div id="postPreview"></div><p class="meta">입력하는 대로 바뀝니다. ‘지원제도 활용 가능’ 표시는 동의한 구직자 본인에게만 보입니다.</p></aside>
+          </div>
+          <div class="grid2 top-gap" id="empArea" hidden>
+            <div class="panel" id="postCheck"></div>
+            <div class="panel" id="postPublish"></div>
           </div>
         </div>
-      </div>
+        <div data-epane="list" hidden>
+          <div class="grid-list">
+            <div class="panel" id="myPosts"></div>
+            <div class="panel" id="postDetail"><div class="empty"><span>📋</span><p>왼쪽에서 공고를 고르세요.</p></div></div>
+          </div>
+        </div>
+        <div class="panel top-gap" id="contractPanel" hidden></div>
+        <div class="panel top-gap" id="payPanel" hidden></div>
       <div class="panel top-gap" id="hiredocPanel" hidden>
-        <h2 class="panel-title">⑥-2 채용 확정 서류 — 근로계약서·사업자등록증 한 번만 첨부</h2>
+        <h2 class="panel-title">⑥-2 (선택) 외부 서류 첨부 판독 — 사업자등록증·다른 양식 근로계약서</h2>
         <p class="muted" id="hdWho"></p>
         <div class="grid2">
           <div>
@@ -267,17 +265,6 @@
           <div class="result" id="hdResult" aria-live="polite"></div>
         </div>
       </div>
-      <div class="panel top-gap" id="docsPanel" hidden>
-        <h2 class="panel-title">⑦ 참여사업 관리 — 월별 서류 사전 점검</h2>
-        <p class="muted">고용24 기업 로그인 → [참여사업 관리]에서 지원사업을 고르고, 매달 급여명세서·이체확인증을 올립니다. AI가 서류의 성명·귀속월·금액을 읽고, 규칙엔진이 <b>그 달 기준</b>으로 바로 점검합니다. 신청 시기가 되면 점검된 서류가 담당자 확인 대시보드로 넘어가 다시 낼 필요가 없습니다.</p>
-        <div class="docs-head">
-          <div class="field"><label for="docsProgram">참여 지원사업</label><select id="docsProgram"><option>청년일자리도약장려금 (2026 지침)</option><option disabled>일·생활 균형 지원금 (확장 예정)</option></select></div>
-          <div class="muted" id="docsWho"></div>
-          <button class="btn ghost" id="docsAll" type="button">합성 서류 6개월분 한 번에 올리기 (시연)</button>
-        </div>
-        <div id="docsMonths"></div>
-        <div id="docsSummary"></div>
-        <p class="meta">※ 판독·점검은 원본 대조를 돕는 참고 정보이며 지급 가능 여부를 판정하지 않습니다. 시연 서류는 합성 데이터입니다.</p>
       </div>
     </div>
   </section>
@@ -318,7 +305,7 @@
       <ul class="sources">
         <li>고용24 OpenAPI 채용정보 — 이용 승인 후 연동 (현재 합성 공고로 시연)</li>
         <li>2026년 청년일자리도약장려금 사업운영 지침 — 고용노동부</li>
-        <li>최저임금 고시(2024~2026년), 근로기준법·최저임금법·기간제법 조문</li>
+        <li>최저임금 고시(2024~2027년), 근로기준법(제17조·제48조 등)·최저임금법·기간제법 조문, 고용노동부 표준근로계약서 양식</li>
         <li>예시 입력값·추천 대상 공고·가상 지원자 — 자체 생성 합성 데이터 (실제 개인정보 미사용)</li>
       </ul>
       <p class="status" id="status">연동 상태 확인 중…</p>
@@ -328,9 +315,12 @@
 
 <div class="toast" id="toast" role="status" hidden></div>
 <footer class="footer"><div class="wrap">이음24 · AI 고용서비스 시제품 · 합성 데이터 시연 · 표시와 점검 결과는 참고용이며 최종 확인은 고용센터가 합니다.</div></footer>
+<script src="js/store.js"></script>
+<script src="js/contract.js"></script>
 <script src="js/claimdocs.js"></script>
 <script src="js/hiredocs.js"></script>
 <script src="js/app.js"></script>
-<script>window.IeumDocs && window.IeumDocs.init(); if (window.IeumHireDocs) window.IeumHireDocs.init()</script>
+<script src="js/workflow.js"></script>
+<script>window.IeumDocs && window.IeumDocs.init(); if (window.IeumHireDocs) window.IeumHireDocs.init(); route();</script>
 </body>
 </html>

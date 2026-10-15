@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from ai import generate_json, model_name, provider  # noqa: E402
 from common import ApiError, JsonHandler, text  # noqa: E402
 from match import guard, rank  # noqa: E402
-from userinput import parse_seeker, persona_to_form, seeker_history_lines  # noqa: E402
+from userinput import parse_posting, parse_seeker, persona_to_form, seeker_history_lines  # noqa: E402
 from rules import judge  # noqa: E402
 from synthetic import PERSONAS  # noqa: E402
 from work24 import load_postings  # noqa: E402
@@ -51,8 +51,26 @@ def fallback(p: dict, picks: list[dict]) -> dict:
     return {"activities": acts, "competencies": comps, "reasons": reasons}
 
 
-def run(p: dict) -> dict:
+def extra_postings(items) -> list[dict]:
+    """기업 화면 [공고 올리기]로 게시된 공고 (저장소에서 화면이 읽어 보냄). 같은 규칙으로 다시 검증한다."""
+    out = []
+    for x in (items if isinstance(items, list) else [])[:30]:
+        if not isinstance(x, dict) or not isinstance(x.get("form"), dict):
+            continue
+        try:
+            post = parse_posting(x["form"])
+        except ApiError:
+            continue
+        post["id"] = text(x.get("id"), 40) or "U-?"
+        post["skills"] = [text(s, 30) for s in (x.get("skills") or [])[:8] if text(s, 30)] if isinstance(x.get("skills"), list) else []
+        post["source"] = "employer"
+        out.append(post)
+    return out
+
+
+def run(p: dict, extra: list | None = None) -> dict:
     postings, source = load_postings()
+    postings = list(postings) + (extra or [])
     blob = f"{p['experience']} {p['desire']['job']}"
     picks, excluded = rank(postings, blob, p["desire"]["job"], p["desire"]["region"])
     base = fallback(p, picks)
@@ -108,7 +126,7 @@ def run(p: dict) -> dict:
     for r in picks:
         post = r["post"]
         j = judge(p, post, p["consent"])
-        jobs.append({"id": post["id"], "company": post["company"], "title": post["title"], "region": post["region"],
+        jobs.append({"id": post["id"], "busino": post.get("busino") or "", "source": post.get("source") or "", "company": post["company"], "title": post["title"], "region": post["region"],
                      "emp_type": post["emp_type"], "wage": post.get("wage"), "close": post.get("close"), "url": post.get("url"),
                      "matched": r["matched"], "reason": reasons.get(post["id"]), "prep": preps.get(post["id"], ""),
                      "badge": {"show": j["badge"], "eligible": j["eligible"], "type": j["type"], "text": j["seeker_text"], "basis": j["basis"]}})
@@ -157,6 +175,6 @@ class handler(JsonHandler):
         return {"ok": True, "examples": [{"id": p["id"], "label": f"{p['alias']} · {p['label']}", "form": persona_to_form(p)} for p in PERSONAS]}
 
     def handle_post(self):
-        body = self.read_json(max_body=60_000)
+        body = self.read_json(max_body=120_000)
         p = parse_seeker(body)
-        return portfolio(p) if body.get("action") == "portfolio" else run(p)
+        return portfolio(p) if body.get("action") == "portfolio" else run(p, extra_postings(body.get("extra_postings")))

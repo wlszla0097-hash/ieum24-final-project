@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from ai import model_name, provider  # noqa: E402
 from common import JsonHandler  # noqa: E402
+from demostore import mode as store_mode  # noqa: E402
 
 
 class handler(JsonHandler):
@@ -14,4 +15,5 @@ class handler(JsonHandler):
         base = os.environ.get("ANTHROPIC_BASE_URL") if provider() == "claude" else os.environ.get("GEMINI_BASE_URL")
         return {"ok": True, "ai": provider() or "not_configured", "model": model_name() if provider() else None,
                 "ai_endpoint": urlparse(base).netloc if base else "official",  # 중계 서버 사용 시 호스트 이름만 표시
-                "work24": "configured" if os.environ.get("WORK24_KEY") else "synthetic"}
+                "work24": "configured" if os.environ.get("WORK24_KEY") else "synthetic",
+                "store": store_mode()}  # upstash | memory(로컬) | off(브라우저 저장)
