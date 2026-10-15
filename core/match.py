@@ -22,11 +22,14 @@ def rank(postings: list[dict], profile_text: str, job: str, region: str, today: 
     today = today or date.today()
     blob = profile_text.lower()
     job_words = _words(job)
-    ranked, excluded = [], {"arrears": 0, "closed": 0, "min_wage": 0}
+    ranked, excluded = [], {"arrears": 0, "tax_arrears": 0, "closed": 0, "min_wage": 0}
     rate = MIN_WAGE.get(today.year) or MIN_WAGE[max(MIN_WAGE)]
     for p in postings:
         if p.get("arrears"):
             excluded["arrears"] += 1
+            continue
+        if p.get("tax_arrears"):  # 국세 고액·상습 체납 명단 기업은 임금체불과 같이 추천하지 않음
+            excluded["tax_arrears"] += 1
             continue
         if p.get("wage") and p["wage"] / monthly_hours(p.get("weekly_hours") or 40) + 0.5 < rate:
             excluded["min_wage"] += 1  # 최저임금 미달로 보이는 공고는 추천하지 않음

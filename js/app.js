@@ -233,7 +233,7 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     ${meta.no_match ? `<div class="msg info">작성한 경험·희망 직무와 맞는 공고가 아직 없어요. 희망 직무를 바꾸거나 경험에 사용한 도구·기술을 더 적어 보세요.</div>` : ""}
     ${jobs.length && !meta.consent ? `<div class="msg info">‘지원제도 활용 가능’ 표시에 동의하지 않아 기업에는 아무 표시도 보이지 않아요.</div>` : ""}
     ${cards}
-    <p class="meta">공고 출처: ${meta.postings_source === "live" ? "고용24 채용정보 실시간" : "합성 공고(고용24 OpenAPI 승인 전 시연)"} · 제외: 임금체불 명단공개 ${ex.arrears}건, 최저임금 미달 ${ex.min_wage || 0}건, 마감 ${ex.closed}건</p>
+    <p class="meta">공고 출처: ${meta.postings_source === "live" ? "고용24 채용정보 실시간" : "합성 공고(고용24 OpenAPI 승인 전 시연)"} · 제외: 임금체불 명단공개 ${ex.arrears}건, 고액·상습 체납 ${ex.tax_arrears || 0}건, 최저임금 미달 ${ex.min_wage || 0}건, 마감 ${ex.closed}건</p>
     <h3>📄 내 포트폴리오</h3>
     <p class="muted">위에서 정리된 활동으로 AI가 초안을 한 번만 만들고, 직접 고쳐서 등록합니다. 기업은 <b>핵심 포인트</b>를 먼저 보고, 필요할 때만 전체를 펼칩니다. 참여 사업명은 기업 화면에서 자동으로 가려집니다.</p>
     <div class="pf-actions"><button class="btn ghost" id="pfAi" type="button">AI 초안 만들기</button><span class="muted" id="pfMsg"></span></div>
