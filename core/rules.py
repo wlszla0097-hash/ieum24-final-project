@@ -13,6 +13,9 @@ GUIDE_YOUTH = f"{GUIDE} 1-3항 (취업애로청년)"
 CAPITAL = ("서울", "경기", "인천")
 OK, CHECK, BAD, INFO = "충족", "확인 필요", "미충족", "안내"
 
+# 지원 제외 업종 (업종명 키워드). ※ 지침 원문의 제외 업종 목록과 대조해 확정·보완할 것 — 현재는 시연용 대표 사례
+EXCLUDED_INDUSTRIES = ("유흥 주점", "무도장", "사행시설")
+
 
 def d(s: str | None) -> date | None:
     try:
@@ -127,6 +130,15 @@ def posting_check(post: dict) -> dict:
         add(OK, "임금체불 명단공개", "해당 없음", "고용24 임금체불 명단공개 사업주 여부")
     else:
         add(INFO, "임금체불 명단공개", "고용24 OpenAPI 연동 후 자동 확인", "고용24 임금체불 명단공개 사업주 여부")
+
+    ind = str(post.get("industry") or "")
+    if ind:
+        hit = next((w for w in EXCLUDED_INDUSTRIES if w in ind), None)
+        add(BAD if hit else OK, "업종", f"'{ind}' — 지원 제외 업종에 해당 (지침 원문으로 최종 확인)" if hit else f"{ind} — 제외 업종 아님",
+            f"{GUIDE} 지원 제외 업종")
+
+    if post.get("tax_arrears"):
+        add(BAD, "고액·상습 체납", "국세·지방세 고액·상습 체납자 명단에 해당 — 지원 제한 대상 여부 확인", "국세청 고액·상습체납자 명단공개 (모의)")
 
     if post.get("discrim"):
         add(CHECK, "채용 차별 소지 표현", "공고에 '" + "', '".join(post["discrim"]) + "' 표현 — 합리적 이유 없는 연령·성별 제한은 금지되므로 삭제·수정 검토",

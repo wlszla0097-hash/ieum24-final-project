@@ -31,3 +31,21 @@ def test_checker_passes_on_examples():
     r = subprocess.run([sys.executable, str(ROOT / "tools" / "check_synthetic.py")], capture_output=True, text=True,
                        env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_company_lookup_filters_excluded_and_arrears():
+    sys.path.insert(0, str(ROOT / "api"))
+    from rules import posting_check
+    from userinput import parse_posting
+    base = {"sido": "서울", "sigungu": "강남구", "title": "매장 관리 직원", "job": "매장 관리", "emp_type": "정규직", "wage": 2500000,
+            "weekly_hours": 40, "priority": "모름"}
+    cases = {"000-81-00089": "업종", "0008100112": "임금체불 명단공개", "0008100134": "고액·상습 체납"}
+    for b, item in cases.items():
+        post = parse_posting({**base, "busino": b})
+        chk = posting_check(post)
+        assert chk["verdict"] == "연계 어려움", (b, chk)
+        assert any(i["item"] == item and i["level"] == "미충족" for i in chk["items"]), (b, chk["items"])
+    ok = posting_check(parse_posting({**base, "busino": "0008100012"}))
+    assert not any(i["level"] == "미충족" for i in ok["items"])
+    unknown = parse_posting({**base, "busino": "0009999999"})
+    assert unknown["lookup"].startswith("등록되지 않은")

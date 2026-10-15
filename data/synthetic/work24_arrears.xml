@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 예시 2건 (docs/data-spec.md 연번 2). companies.json 의 모든 busino 에 대해 1건씩 만들어 주세요. -->
+<!-- 고용24 임금체불 명단공개 사업주 여부 응답 형식 (docs/data-spec.md 연번 2) · 가상 기업 -->
 <root>
   <jdgnList>
     <lnkReqNo>1</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100012</brno><bzmn>00000000001</bzmn>
@@ -8,5 +8,49 @@
   <jdgnList>
     <lnkReqNo>2</lnkReqNo><lnkSucsYn>N</lnkSucsYn><brno>0008100023</brno><bzmn></bzmn>
     <judgReltYn></judgReltYn><errMsgCd>ERR0011</errMsgCd><errMsg>사업장 정보 없음</errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>3</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100034</brno><bzmn>00000000003</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>4</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100045</brno><bzmn>00000000004</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>5</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100056</brno><bzmn>00000000005</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>6</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100067</brno><bzmn>00000000006</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>7</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100078</brno><bzmn>00000000007</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>8</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100089</brno><bzmn>00000000008</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>9</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100090</brno><bzmn>00000000009</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>10</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100101</brno><bzmn>00000000010</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>11</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100112</brno><bzmn>00000000011</bzmn>
+    <judgReltYn>Y</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>12</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100123</brno><bzmn>00000000012</bzmn>
+    <judgReltYn>Y</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
+  </jdgnList>
+  <jdgnList>
+    <lnkReqNo>13</lnkReqNo><lnkSucsYn>Y</lnkSucsYn><brno>0008100134</brno><bzmn>00000000013</bzmn>
+    <judgReltYn>N</judgReltYn><errMsgCd></errMsgCd><errMsg></errMsg>
   </jdgnList>
 </root>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 예시 2건 (docs/data-spec.md 연번 1). 복사해서 20건까지 늘려 주세요. -->
+<!-- 고용24 채용정보 목록 응답 형식 (docs/data-spec.md 연번 1) · 가상 공고 -->
 <wantedRoot>
-  <total>2</total><startPage>1</startPage><display>2</display>
+  <total>13</total><startPage>1</startPage><display>13</display>
   <wanted>
     <wantedAuthNo>K000000001</wantedAuthNo>
     <company>한빛소프트랩(가상)</company>
@@ -9,9 +9,9 @@
     <indTpNm>소프트웨어 개발 및 공급업</indTpNm>
     <title>웹 프론트엔드 개발자 신입 JavaScript React</title>
     <salTpNm>월급</salTpNm>
-    <sal>280만원 ~ 300만원</sal>
+    <sal>280만원</sal>
     <minSal>2800000</minSal>
-    <maxSal>3000000</maxSal>
+    <maxSal>2800000</maxSal>
     <region>서울 마포구</region>
     <holidayTpNm>주5일근무</holidayTpNm>
     <minEdubg>학력무관</minEdubg>
@@ -22,10 +22,10 @@
     <infoSvc>VALIDATION</infoSvc>
     <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
     <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
-    <zipCd>04000</zipCd>
+    <zipCd>00000</zipCd>
     <strtnmCd>0</strtnmCd>
     <basicAddr>서울특별시 마포구 가상로 1</basicAddr>
-    <detailAddr>2층</detailAddr>
+    <detailAddr>1층</detailAddr>
     <empTpCd>10</empTpCd>
     <jobsCd>133100</jobsCd>
     <smodifyDtm>202610010900</smodifyDtm>
@@ -42,20 +42,328 @@
     <maxSal>2000000</maxSal>
     <region>경북 구미시</region>
     <holidayTpNm>주5일근무</holidayTpNm>
-    <minEdubg>고졸</minEdubg>
+    <minEdubg>학력무관</minEdubg>
     <maxEdubg></maxEdubg>
     <career>신입</career>
-    <regDt>20261005</regDt>
+    <regDt>20261001</regDt>
     <closeDt>20261231</closeDt>
     <infoSvc>VALIDATION</infoSvc>
     <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
     <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
-    <zipCd>39000</zipCd>
+    <zipCd>00000</zipCd>
     <strtnmCd>0</strtnmCd>
     <basicAddr>경상북도 구미시 가상로 2</basicAddr>
-    <detailAddr>물류센터</detailAddr>
+    <detailAddr>1층</detailAddr>
     <empTpCd>10</empTpCd>
     <jobsCd>312100</jobsCd>
-    <smodifyDtm>202610050900</smodifyDtm>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000003</wantedAuthNo>
+    <company>다온물류센터(가상)</company>
+    <busino>0008100034</busino>
+    <indTpNm>창고 및 운송관련 서비스업</indTpNm>
+    <title>물류 관리 사원 입출고 재고 엑셀</title>
+    <salTpNm>월급</salTpNm>
+    <sal>240만원</sal>
+    <minSal>2400000</minSal>
+    <maxSal>2400000</maxSal>
+    <region>경기 이천시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>경기도 이천시 가상로 3</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>312100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000004</wantedAuthNo>
+    <company>세움정밀(가상)</company>
+    <busino>0008100045</busino>
+    <indTpNm>기타 기계 및 장비 제조업</indTpNm>
+    <title>품질관리 사원 QC 측정</title>
+    <salTpNm>월급</salTpNm>
+    <sal>260만원</sal>
+    <minSal>2600000</minSal>
+    <maxSal>2600000</maxSal>
+    <region>인천 남동구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>인천광역시 남동구 가상로 4</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>851100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000005</wantedAuthNo>
+    <company>온새미디자인(가상)</company>
+    <busino>0008100056</busino>
+    <indTpNm>전문 디자인업</indTpNm>
+    <title>UI 디자이너 신입 Figma UX</title>
+    <salTpNm>월급</salTpNm>
+    <sal>240만원</sal>
+    <minSal>2400000</minSal>
+    <maxSal>2400000</maxSal>
+    <region>대구 북구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>대구광역시 북구 가상로 5</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>285100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000006</wantedAuthNo>
+    <company>누리커머스(가상)</company>
+    <busino>0008100067</busino>
+    <indTpNm>통신 판매업</indTpNm>
+    <title>쇼핑몰 웹 퍼블리셔 HTML CSS</title>
+    <salTpNm>월급</salTpNm>
+    <sal>240만원</sal>
+    <minSal>2400000</minSal>
+    <maxSal>2400000</maxSal>
+    <region>서울 금천구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>서울특별시 금천구 가상로 6</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>133200</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000007</wantedAuthNo>
+    <company>대한금융솔루션(가상)</company>
+    <busino>0008100078</busino>
+    <indTpNm>그 밖의 금융 지원 서비스업</indTpNm>
+    <title>웹 서비스 개발자 Java Spring</title>
+    <salTpNm>월급</salTpNm>
+    <sal>360만원</sal>
+    <minSal>3600000</minSal>
+    <maxSal>3600000</maxSal>
+    <region>서울 영등포구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>서울특별시 영등포구 가상로 7</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>133100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000008</wantedAuthNo>
+    <company>별빛라운지(가상)</company>
+    <busino>0008100089</busino>
+    <indTpNm>일반 유흥 주점업</indTpNm>
+    <title>매장 관리 직원</title>
+    <salTpNm>월급</salTpNm>
+    <sal>250만원</sal>
+    <minSal>2500000</minSal>
+    <maxSal>2500000</maxSal>
+    <region>서울 강남구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>서울특별시 강남구 가상로 8</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>521000</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000009</wantedAuthNo>
+    <company>드림댄스홀(가상)</company>
+    <busino>0008100090</busino>
+    <indTpNm>무도장 운영업</indTpNm>
+    <title>시설 운영 사무원</title>
+    <salTpNm>월급</salTpNm>
+    <sal>230만원</sal>
+    <minSal>2300000</minSal>
+    <maxSal>2300000</maxSal>
+    <region>부산 해운대구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>부산광역시 해운대구 가상로 9</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>312100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000010</wantedAuthNo>
+    <company>행운게임랜드(가상)</company>
+    <busino>0008100101</busino>
+    <indTpNm>기타 사행시설 관리 및 운영업</indTpNm>
+    <title>고객 응대 사무원</title>
+    <salTpNm>월급</salTpNm>
+    <sal>235만원</sal>
+    <minSal>2350000</minSal>
+    <maxSal>2350000</maxSal>
+    <region>경기 성남시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>경기도 성남시 가상로 10</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>312100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000011</wantedAuthNo>
+    <company>한결전자(가상)</company>
+    <busino>0008100112</busino>
+    <indTpNm>전자부품 제조업</indTpNm>
+    <title>품질검사원 주간 측정</title>
+    <salTpNm>월급</salTpNm>
+    <sal>250만원</sal>
+    <minSal>2500000</minSal>
+    <maxSal>2500000</maxSal>
+    <region>경북 구미시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>경상북도 구미시 가상로 11</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>851100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000012</wantedAuthNo>
+    <company>대명산업(가상)</company>
+    <busino>0008100123</busino>
+    <indTpNm>플라스틱 제품 제조업</indTpNm>
+    <title>생산 품질 사원</title>
+    <salTpNm>월급</salTpNm>
+    <sal>245만원</sal>
+    <minSal>2450000</minSal>
+    <maxSal>2450000</maxSal>
+    <region>경기 화성시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>경기도 화성시 가상로 12</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>851100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000013</wantedAuthNo>
+    <company>새솔건설(가상)</company>
+    <busino>0008100134</busino>
+    <indTpNm>건물 건설업</indTpNm>
+    <title>현장 사무원 엑셀 공정 관리</title>
+    <salTpNm>월급</salTpNm>
+    <sal>250만원</sal>
+    <minSal>2500000</minSal>
+    <maxSal>2500000</maxSal>
+    <region>충남 천안시</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20261001</regDt>
+    <closeDt>20261231</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>충청남도 천안시 가상로 13</basicAddr>
+    <detailAddr>1층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>312100</jobsCd>
+    <smodifyDtm>202610010900</smodifyDtm>
   </wanted>
 </wantedRoot>

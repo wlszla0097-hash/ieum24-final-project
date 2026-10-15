@@ -96,9 +96,23 @@ def enrich(post: dict, companies: dict, arrears: dict) -> dict:
     post["priority"] = c.get("priority")
     post["weekly_hours"] = c.get("weekly_hours") or 40
     post["region"] = post.get("region") or c.get("region") or ""
+    post["industry"] = post.get("industry") or c.get("indTpNm") or ""
+    post["tax_arrears"] = bool(c.get("tax_arrears"))
     if post.get("busino") in arrears:
         post["arrears"] = arrears[post["busino"]]
     return post
+
+
+def lookup_company(busino) -> dict | None:
+    """사업자번호 → 공공데이터 조회 결과(합성). 실제 연동 시 고용24 임금체불 API·국민연금 사업장 등으로 교체.
+    반환: {industry, insured, priority, arrears(True/False/None), tax_arrears} 또는 None(등록되지 않은 번호)."""
+    b = _digits(busino)
+    companies = load_companies()
+    if b not in companies:
+        return None
+    c, arrears = companies[b], load_arrears()
+    return {"industry": c.get("indTpNm") or "", "insured": c.get("insured"), "priority": c.get("priority"),
+            "arrears": arrears.get(b), "tax_arrears": bool(c.get("tax_arrears"))}
 
 
 def load_postings() -> list[dict]:

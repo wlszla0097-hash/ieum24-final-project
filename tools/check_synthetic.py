@@ -113,11 +113,16 @@ else:
             if (w_el.findtext("empTpCd") or "").strip() not in ("10", "11", "20", "21"):
                 err(f"{w}: empTpCd 는 10·11·20·21 중 하나")
         posts = df.load_postings()
+        comp_map = df.load_companies()
         print(f"  {len(posts)}건 — 서비스 점검 결과:")
         for p in posts:
             chk = posting_check(p)
             flags = [f"{x['item']}({x['level']})" for x in chk["items"] if x["level"] in ("미충족", "확인 필요")]
-            print(f"   · {p['company']} — {p['title'][:22]} → {chk['verdict']}" + (f" | {', '.join(flags)}" if flags else ""))
+            exp = (comp_map.get(p.get("busino")) or {}).get("expect")
+            mark = "" if not exp else (" ✅" if exp == chk["verdict"] else f" ❌ 기대 '{exp}'")
+            print(f"   · {p['company']} — {p['title'][:22]} → {chk['verdict']}{mark}" + (f" | {', '.join(flags)}" if flags else ""))
+            if exp and exp != chk["verdict"]:
+                warn(f"{p['company']}: 기대 '{exp}' 와 공고 점검 결과 '{chk['verdict']}' 가 다름")
     except ET.ParseError as e:
         err(f"work24_postings.xml: XML 형식 오류 — {e}")
 

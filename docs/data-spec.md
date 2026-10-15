@@ -10,7 +10,7 @@
 - **사업자등록번호는 `000-`으로 시작**하는 가짜 번호만 씁니다 (예: `000-81-00012`). 실제 번호와 겹치지 않게 하기 위함입니다.
 - **항목명(영문 태그·키)은 이 문서와 똑같이** 씁니다. 바꾸면 코드가 읽지 못합니다.
 - 날짜는 `YYYY-MM-DD`(API 원형이 `YYYYMMDD`면 그 형식), 금액은 숫자만(원 단위, 쉼표 없음).
-- 파일은 `data/synthetic/` 아래에 둡니다. 작업은 브랜치(A: `seeker-data`, B: `company-data`)에서 하고 Pull Request로 올립니다.
+- 파일은 `data/synthetic/` 아래에 둡니다. 작업은 각자 브랜치(예: `seeker-data-이름`)에서 하고 Pull Request로 올립니다.
 - 정상 사례만이 아니라 **점검에 걸려야 하는 오류 사례**도 섞습니다 (각 데이터의 "오류 사례" 참고). 사례마다 `note`에 의도를 적습니다.
 - `data/synthetic/`에 **예시 파일이 이미 들어 있습니다.** 복사해서 늘리는 방식으로 작업하세요.
 
@@ -30,21 +30,21 @@
 
 | 연번 | 출처 | 데이터명 | 서비스 URL | 담당 | 합성 파일 |
 |---|---|---|---|---|---|
-| 1 | 고용24(한국고용정보원) | 채용정보 목록 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do | A | `data/synthetic/work24_postings.xml` |
-| 2 | 고용24(한국고용정보원) | 임금체불 명단공개 사업주 여부 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do | B | `data/synthetic/work24_arrears.xml` |
+| 1 | 고용24(한국고용정보원) | 채용정보 목록 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do | 팀원 | `data/synthetic/work24_postings.xml` |
+| 2 | 고용24(한국고용정보원) | 임금체불 명단공개 사업주 여부 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do | 팀장 | `data/synthetic/work24_arrears.xml` |
 | 3 | 고용노동부(공개 문서) | 2026년 청년일자리도약장려금 사업운영 지침 | https://www.moel.go.kr/news/notice/noticeView.do?bbs_seq=20260400705 | 팀장 | `core/rules.py` (규칙DB) |
-| 4 | 모의데이터 | 구직자 참여 이력 (국민취업지원제도·청년도전지원사업) | - | A | `data/synthetic/seekers.json` |
-| 5 | 모의데이터 | 고용보험 피보험 이력 | - | A | `data/synthetic/seekers.json` (구직자별 `insurance`) |
-| 6 | 모의데이터 | 근로계약서 | https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20250300356 (표준근로계약서 참고) | B | `data/synthetic/contracts.json` |
-| 7 | 모의데이터 | 급여명세서 | - | B | `data/synthetic/docs/` + `docs_answer.json` |
-| 8 | 모의데이터 | 이체확인증 | - | B | `data/synthetic/docs/` + `docs_answer.json` |
-| 9 | 모의데이터 | 채용공고·기업 정보 (시연용) | - | B | `data/synthetic/companies.json` |
+| 4 | 모의데이터 | 구직자 참여 이력 (국민취업지원제도·청년도전지원사업) | - | 팀원 | `data/synthetic/seekers.json` |
+| 5 | 모의데이터 | 고용보험 피보험 이력 | - | 팀원 | `data/synthetic/seekers.json` (구직자별 `insurance`) |
+| 6 | 모의데이터 | 근로계약서 | https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20250300356 (표준근로계약서 참고) | 팀장 | `data/synthetic/contracts.json` |
+| 7 | 모의데이터 | 급여명세서 | - | 팀장 | `data/synthetic/docs/` + `docs_answer.json` |
+| 8 | 모의데이터 | 이체확인증 | - | 팀장 | `data/synthetic/docs/` + `docs_answer.json` |
+| 9 | 모의데이터 | 채용공고·기업 정보 (시연용) | - | 팀장 | `data/synthetic/companies.json` |
 
 연결 키: **사업자등록번호** — 채용정보의 `busino` = 기업 정보의 `busino` = 임금체불 조회의 `brno`.
 
 ## 2. 고용24 API 형식 (실제 응답과 같은 구조)
 
-### 연번 1 · 채용정보 목록 `work24_postings.xml` — 목표 20건 (A)
+### 연번 1 · 채용정보 목록 `work24_postings.xml` — 목표 20건 (팀원)
 
 `<wanted>` 하나가 공고 1건입니다. 26개 항목을 모두 채웁니다.
 
@@ -86,7 +86,7 @@
 다양하게 구성할 것: 수도권/비수도권, 정규직(10·11)/기간제(20·21), 직무 5종 이상(웹 개발·사무·물류·품질·디자인 등).
 **오류 사례 2건 이상**: 월급이 최저임금 미달인 공고, 마감일이 지난 공고.
 
-### 연번 2 · 임금체불 명단공개 사업주 여부 `work24_arrears.xml` — 기업 12곳 (B)
+### 연번 2 · 임금체불 명단공개 사업주 여부 `work24_arrears.xml` — 기업 13곳 (팀장 작성 완료)
 
 요청: 사업자등록번호(`brno`)로 1건씩 조회. 기업 정보(연번 9)의 모든 `busino`에 대해 1건씩 만듭니다.
 
@@ -106,7 +106,7 @@
 
 ## 3. 모의데이터 형식
 
-### 연번 4·5 · 구직자 `seekers.json` — 8~10명 (A)
+### 연번 4·5 · 구직자 `seekers.json` — 8~10명 (팀원)
 
 현재 코드(`core/synthetic.py`의 `PERSONAS`)와 같은 구조입니다.
 
@@ -132,7 +132,7 @@
 - `activities[].kind`: 상담 / 훈련 / 프로젝트 / 직무체험 / 자격
 - 섞을 것: 국취 참여 후 취업 이력 없음, 국취 참여 **후** 이미 취업(배지 비대상), 청년도전 미수료, 참여 이력 없음, 만 34세·35세 경계
 
-### 연번 6 · 근로계약서 `contracts.json` (B)
+### 연번 6 · 근로계약서 `contracts.json` (팀장)
 
 키는 근로계약 점검 코드(`core/labor.py`)의 입력과 같습니다.
 
@@ -153,7 +153,7 @@
 
 **오류 사례 각 1건 이상**: 최저임금 미달, 휴게시간 부족(8시간에 30분), 주 40시간 초과, 필수 기재사항 누락(`has_*` 중 하나 false), 기간제인데 `end_date` 없음.
 
-### 연번 7·8 · 급여명세서·이체확인증 `docs/` + `docs_answer.json` (B)
+### 연번 7·8 · 급여명세서·이체확인증 `docs/` + `docs_answer.json` (팀장)
 
 - 이미지(`.png`/`.jpg`)로 만듭니다. 양식 2~3종(기업·은행마다 배치가 다르게). 현재 생성기: `js/claimdocs.js`.
 - 이미지마다 **정답값**을 `docs_answer.json`에 적습니다. AI 판독 결과와 비교하는 기준입니다.
@@ -169,20 +169,34 @@
 
 **오류 사례**: 실지급액≠이체액, 성명 불일치, 귀속월 불일치, 최저임금 미달.
 
-### 연번 9 · 채용공고·기업 정보 `companies.json` — 12곳 (B)
+### 연번 9 · 채용공고·기업 정보 `companies.json` — 현재 13곳 (팀장 작성 완료)
 
 ```json
 [
   {
     "busino": "0008100012", "company": "한빛소프트랩(가상)", "indTpNm": "소프트웨어 개발 및 공급업",
-    "region": "서울 마포구", "insured": 18, "priority": true,
-    "weekly_hours": 40, "note": "수도권·우선지원대상기업·정상"
+    "region": "서울 마포구", "insured": 18, "priority": true, "weekly_hours": 40,
+    "tax_arrears": false, "expect": "연계 가능성 높음", "note": "수도권·우선지원·정상"
   }
 ]
 ```
 
-- `insured`: 피보험자 수, `priority`: 우선지원대상기업 여부
-- 섞을 것: 비수도권 기업, 피보험자 5인 미만, 우선지원대상 아님
+- `indTpNm`: 업종(고용24 채용정보 `indTpNm`과 같은 값), `insured`: 피보험자 수, `priority`: 우선지원대상기업 여부
+- `tax_arrears`: 국세 고액·상습 체납 여부 (모의 — 국세청 고액·상습체납자 명단공개 참고)
+- `expect`: 이 기업 공고의 기대 점검 결과 — `연계 가능성 높음` / `확인 필요` / `연계 어려움`
+
+**현재 구성 (13곳, 기업마다 공고 1건·임금체불 조회 1건 연결)**
+
+| 구분 | 기업(가상) | 기대 결과 | 걸러지는 근거 |
+|---|---|---|---|
+| 정상 | 한빛소프트랩, 다온물류센터, 세움정밀, 온새미디자인(비수도권) | 연계 가능성 높음 | — |
+| 확인 필요 | 누리커머스(피보험자 3명), 대한금융솔루션(우선지원대상 아님) | 확인 필요 | 기업 규모 요건 |
+| **지원 제외 업종** | 별빛라운지(일반 유흥 주점업), 드림댄스홀(무도장 운영업), 행운게임랜드(기타 사행시설 관리 및 운영업) | 연계 어려움 | 업종 (`indTpNm`) |
+| **임금체불·체납** | 한결전자·대명산업(임금체불 명단공개 `judgReltYn=Y`), 새솔건설(고액·상습 체납) | 연계 어려움 | 임금체불 API / 체납 |
+| 복합 오류 | 가온물산(최저임금 미달 공고 + 5인 미만 + 임금체불 조회 실패) | 연계 어려움 | 최저임금 등 |
+
+- 기업 화면 공고 입력의 **사업자등록번호** 칸에 위 번호를 넣으면, 업종·임금체불·체납 조회 결과가 자동으로 붙어 점검됩니다.
+- 지원 제외 업종 목록(`core/rules.py`의 `EXCLUDED_INDUSTRIES`)은 시연용 대표 사례입니다. **지침 원문의 제외 업종과 대조해 확정**해야 합니다.
 
 ## 4. 실제 공공데이터 연동 계획 (팀장)
 

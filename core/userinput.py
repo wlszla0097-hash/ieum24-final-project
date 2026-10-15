@@ -130,7 +130,21 @@ def parse_posting(b: dict) -> dict:
     p["wage"] = int(p["wage"])
     p["insured"] = int(p["insured"]) if p["insured"] is not None else None
     p["priority"] = {"예": True, "아니오": False}.get(text(b.get("priority"), 5))  # 모름 → None (확인 필요)
-    p["arrears"] = None  # 임금체불 명단 여부는 고용24 연동 후 확인
+    p["arrears"] = None  # 임금체불 명단 여부는 사업자번호 조회 결과로 채움
+    p["busino"] = "".join(ch for ch in str(b.get("busino") or "") if ch.isdigit())[:10]
+    p["industry"], p["tax_arrears"], p["lookup"] = "", False, None
+    if p["busino"]:
+        from datafiles import lookup_company
+        info = lookup_company(p["busino"])
+        if info:
+            p["industry"], p["arrears"], p["tax_arrears"] = info["industry"], info["arrears"], info["tax_arrears"]
+            if p["insured"] is None:
+                p["insured"] = info["insured"]
+            if p["priority"] is None:
+                p["priority"] = info["priority"]
+            p["lookup"] = "공공데이터 조회(합성): 업종·임금체불·체납"
+        else:
+            p["lookup"] = "등록되지 않은 사업자번호 — 공공데이터 조회 결과 없음"
     p["skills"] = []
     p["discrim"] = sorted({m.group(0) for m in DISCRIM.finditer(f"{p['title']} {p['description']}")})
     return p
@@ -139,7 +153,8 @@ def parse_posting(b: dict) -> dict:
 def posting_to_form(post: dict) -> dict:
     """합성 공고 → 입력 폼 예시값."""
     sido, _, sigungu = post["region"].partition(" ")
-    return {"company": post["company"], "sido": sido, "sigungu": sigungu, "title": post["title"], "job": post["job"],
+    b = str(post.get("busino") or "")
+    return {"busino": f"{b[:3]}-{b[3:5]}-{b[5:]}" if len(b) == 10 else "", "company": post["company"], "sido": sido, "sigungu": sigungu, "title": post["title"], "job": post["job"],
             "emp_type": post["emp_type"] if post["emp_type"] in EMP_TYPES else "기타", "wage": post["wage"], "weekly_hours": post["weekly_hours"],
             "insured": post["insured"], "priority": "예" if post["priority"] else "아니오",
             "description": f"{post['title']} 채용. 주요 업무와 우대 기술: {', '.join(post['skills'])}. 신입 지원 가능, 주 5일 근무."}
