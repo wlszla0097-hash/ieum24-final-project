@@ -7,6 +7,8 @@
 - **배포 URL**: https://ieum24-final-project.vercel.app
 - **서비스 기획서**: [docs/service-plan.md](docs/service-plan.md)
 - **공공데이터 활용 명세 · 합성데이터 작성 기준**: [docs/data-spec.md](docs/data-spec.md)
+- **AI 서류 판독 방식(발표용)**: [docs/ai-document-reading.md](docs/ai-document-reading.md)
+- **확장 로드맵**: [docs/roadmap.md](docs/roadmap.md)
 - **AI 코딩 도구 사용 기록**: [docs/ai-coding-log.md](docs/ai-coding-log.md)
 - **사전 검증 결과**: [tools/eval_result.md](tools/eval_result.md) (재현: `python3 tools/eval_mvp.py`)
 - 모든 인물·공고·지원자·서류는 **합성(모의) 데이터**입니다. 실제 개인정보는 사용하지 않습니다.
@@ -25,7 +27,7 @@
 | 사용자 | 화면 | 기능 | AI 활용 |
 |---|---|---|---|
 | 구직자 | `#seeker` | 참여 이력·경험 입력 → 활동 정리·역량 문장·포트폴리오 초안, 맞춤 공고 추천, 동의 기반 배지 | 생성형 AI (문장 정리·추천 이유) |
-| 기업 | `#employer` | 공고 점검(지원제도 연계 가능 여부), 지원자 목록(배지만 표시), 채용 확정 시 근로계약 점검·신청 시기 알림, **월별 급여명세서·이체확인증 점검** | 생성형 AI (공고 정리·설명), **멀티모달 AI (서류 이미지 판독)** |
+| 기업 | `#employer` | 공고 점검(사업자번호로 업종·임금체불·체납 조회), 지원자 목록(배지만 표시), 채용 확정 시 근로계약 점검·신청 시기 알림, **채용 확정 서류(근로계약서·사업자등록증) 한 번 첨부 → 판독·대조**, **월별 급여명세서·이체확인증 점검** | 생성형 AI (공고 정리·설명), **멀티모달 AI (서류 이미지 판독)** |
 | 담당자 | `#officer` | 신청 건별 참여 이력 근거·지침 조항·계약 점검·월별 서류 점검 기록을 한 화면에 (자동 판정 없음) | 규칙엔진 결과 요약 |
 
 ## 기술 스택
@@ -41,7 +43,7 @@
 ## 시스템 구조
 
 ```
-브라우저 (index.html + js/app.js, js/claimdocs.js)
+브라우저 (index.html + js/app.js, js/hiredocs.js, js/claimdocs.js)
    │  fetch /api/*
    ▼
 Vercel Functions (api/)
@@ -49,7 +51,7 @@ Vercel Functions (api/)
    employer.py    기업: 공고 점검·지원자 목록
    check.py       근로계약 점검
    cases.py       담당자: 신청 건 목록
-   certificate.py 수료증·월별 서류 판독 (멀티모달)
+   certificate.py 수료증·채용 확정 서류·월별 서류 판독 (멀티모달)
    health.py      연동 상태
    │
    ▼
@@ -60,7 +62,7 @@ core/  rules.py(지침 규칙엔진) · labor.py(근로기준법·최저임금) 
 ## 핵심 AI 활용 — 판단은 규칙엔진, AI는 번역과 설명
 
 1. **생성형 AI**: 서술형 참여 이력 → 직무 역량 문장·포트폴리오 초안, 공고 정리, 점검 결과 설명
-2. **멀티모달 AI**: 급여명세서·이체확인증 이미지에서 성명·귀속월·지급액·이체액만 추출 → 규칙엔진이 그 달 기준으로 점검
+2. **멀티모달 AI**: 근로계약서·사업자등록증·급여명세서·이체확인증 이미지에서 정해진 항목만 추출 → 규칙엔진이 점검하고 공고 입력값·공공데이터와 대조 (방식: docs/ai-document-reading.md)
 3. **할루시네이션 방지 (guard)**: 입력에 없는 숫자·지원금·연령이 들어간 AI 문장, 후보 목록에 없는 공고 ID는 서버에서 차단
 4. **차별 방지**: 배지 사유·연령은 기업에 보이지 않고, 배지 기준 정렬·필터를 제공하지 않음
 5. **AI 윤리**: AI가 만든 내용은 화면에 "AI가 정리" 등으로 표시, AI 처리 동의 없이는 AI 서버로 보내지 않음

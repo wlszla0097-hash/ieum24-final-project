@@ -49,3 +49,24 @@ def test_company_lookup_filters_excluded_and_arrears():
     assert not any(i["level"] == "미충족" for i in ok["items"])
     unknown = parse_posting({**base, "busino": "0009999999"})
     assert unknown["lookup"].startswith("등록되지 않은")
+
+
+def test_hiredoc_reads_and_cross_checks():
+    import base64
+    sys.path.insert(0, str(ROOT / "api"))
+    import certificate as c
+    f = {"media_type": "image/png", "data": base64.b64encode(b"x" * 10).decode()}
+    truth = {"contract": {"worker": "김하늘", "employment_type": "정규직", "start_date": "2026-03-03", "end_date": "", "base_wage": "2500000",
+                          "wage_type": "월급", "weekly_hours": "40", "daily_hours": "8", "break_minutes": "30",
+                          "has_holiday": True, "has_leave": True, "has_place": True, "has_job": True, "has_payday": False},
+             "bizreg": {"busino": "000-81-00112", "company": "한결전자(가상)", "ceo": "", "industry": "제조업 전자부품", "opened": "2012-07-01", "doc_type": "사업자등록증"}}
+    r = c.hiredoc({"files": {"contract": f, "bizreg": f}, "sample_truth": truth, "worker": "김하늘",
+                   "posting": {"wage": 2600000, "emp_type": "정규직", "region": "경북 구미시", "busino": "0008100112", "weekly_hours": 40}})
+    items = {i["item"]: i["level"] for i in r["items"]}
+    assert r["level"] == "위반 의심"
+    assert items["계약서 · 휴게시간"] == "위반 의심"
+    assert items["계약서 · 필수 기재사항"] == "확인 필요"
+    assert items["공고 ↔ 계약서 임금"] == "확인 필요"
+    assert items["사업자등록증 · 임금체불 명단공개"] == "미충족"
+    assert "사업자등록증 · 업종" in items and items["사업자등록증 · 업종"] == "충족"  # 업태·종목 단어가 겹치면 불일치 아님
+    assert r["bizreg"]["busino"] == "0008100112" and "ceo" in r["bizreg"]

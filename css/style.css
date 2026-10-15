@@ -340,3 +340,10 @@ fieldset { min-width: 0; }
 .docs-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
 @media (max-width: 760px) { .docs-head, .month-row, .docs-sum { grid-template-columns: 1fr; } .lane.four { grid-template-columns: 1fr; } }
 .month-row .redo { display: none; margin-top: 6px; } .month-row.done .redo { display: inline-block; } .month-row.done .up-btns { display: none !important; }
+
+/* ⑥-2 채용 확정 서류 */
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+#hdThumbs figure { margin: 0; text-align: center; }
+#hdThumbs img { width: 120px; }
+#hdThumbs figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+#hdThumbs .empty-thumb { width: 120px; height: 150px; border: 1px dashed var(--line); border-radius: 6px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; box-sizing: border-box; }

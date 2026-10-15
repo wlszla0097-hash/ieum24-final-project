@@ -301,7 +301,7 @@ async function runPostCheck() {
   showMsg(msg, "");
   const btn = $("#postBtn");
   btn.disabled = true; btn.textContent = "점검 중…";
-  $("#empArea").hidden = false; $("#hirePanel").hidden = true;
+  $("#empArea").hidden = false; $("#hirePanel").hidden = true; const hdp = $("#hiredocPanel"); if (hdp) hdp.hidden = true;
   $("#postCheck").innerHTML = loadingHtml("규칙엔진이 공고를 점검하고 AI가 공고를 정리하고 있어요");
   $("#applicants").innerHTML = "";
   $("#empArea").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -435,6 +435,16 @@ function renderCheck({ results, explain, ai_error }, cs) {
     <div class="evidence ${cs.evidence.open ? "" : "closed"}"><b>${esc(cs.evidence.title)}</b><ul>${cs.evidence.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>
     <button class="btn primary block" id="sendCase" type="button">담당자 확인 대시보드로 보내기 (시연)</button>
     <p class="meta">※ 입력값 기준 규칙 점검이며 법적 판단이 아닙니다. 결과에 대한 최종 판단은 이용자와 노무 전문가·관할 기관의 몫입니다.</p>`;
+  if (window.IeumHireDocs) {
+    const p = state.post || {}, pi = state.postInput || {};
+    window.IeumHireDocs.open({ worker: (state.hireTarget && state.hireTarget.alias) || "", posting: { company: p.company, title: p.title, region: p.region,
+      wage: p.wage, emp_type: p.emp_type, weekly_hours: p.weekly_hours, busino: String(pi.busino || "").replace(/\D/g, ""), industry: "", hire_date: s.hire_date } });
+    window.IeumHireDocs.setOnDone((hd) => {
+      cs.hiredocs = hd;
+      state.sessionCases = [cs, ...state.sessionCases.filter((x) => x.case_id !== cs.case_id)];
+      toast(`채용 확정 서류 점검 결과를 신청 건에 연결했어요. <a href="#officer">담당자 확인 대시보드</a>에서 확인하세요.`);
+    });
+  }
   if (window.IeumDocs) {
     window.IeumDocs.open(cs, Object.fromEntries(new FormData($("#checkForm")).entries()), "김가람");
     window.IeumDocs.setOnSend((docs) => {
@@ -483,6 +493,7 @@ function caseCard(c) {
       </div>
       <div><h4>확인 항목</h4>${checkList(c.checklist)}</div>
     </div>
+    ${c.hiredocs && window.IeumHireDocs ? `<div class="docs-in-case">${window.IeumHireDocs.block(c.hiredocs)}</div>` : ""}
     ${c.docs && window.IeumDocs ? `<div class="docs-in-case">${window.IeumDocs.docsBlock(c.docs)}</div>` : ""}
     <footer><span class="decision muted">자동 판정 없음 — 확인 후 처리하세요.</span>
       <span><button class="btn ghost decide" data-v="보완 요청" type="button">보완 요청</button> <button class="btn primary decide" data-v="검토 완료" type="button">검토 완료</button></span></footer>

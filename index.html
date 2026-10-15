@@ -246,6 +246,27 @@
           </div>
         </div>
       </div>
+      <div class="panel top-gap" id="hiredocPanel" hidden>
+        <h2 class="panel-title">⑥-2 채용 확정 서류 — 근로계약서·사업자등록증 한 번만 첨부</h2>
+        <p class="muted" id="hdWho"></p>
+        <div class="grid2">
+          <div>
+            <div class="field"><label for="hd_contract">근로계약서 (이미지·PDF)</label><input type="file" id="hd_contract" accept="image/*,application/pdf"></div>
+            <div class="field"><label for="hd_bizreg">사업자등록증 (이미지·PDF)</label><input type="file" id="hd_bizreg" accept="image/*,application/pdf"></div>
+            <p class="muted">시연용 합성 서류 만들기 <small>(실제 양식의 항목 배치만 따르고 내용은 가상)</small></p>
+            <div class="btn-row">
+              <button class="btn ghost" type="button" data-sample="ok">정상 사례</button>
+              <button class="btn ghost" type="button" data-sample="bad">오류 사례</button>
+              <button class="btn ghost" type="button" data-sample="arrears">임금체불 기업 사례</button>
+            </div>
+            <div class="thumbs" id="hdThumbs"></div>
+            <p class="meta" id="hdNote"></p>
+            <button class="btn primary block" id="hdRun" type="button" disabled>서류 판독 · 점검 (AI 판독 → 규칙 대조)</button>
+            <p class="meta">AI는 서류에 인쇄된 항목만 읽고, 주민번호·주소·서명은 출력하지 않습니다. 판정은 규칙엔진이 하고 파일은 저장하지 않습니다.</p>
+          </div>
+          <div class="result" id="hdResult" aria-live="polite"></div>
+        </div>
+      </div>
       <div class="panel top-gap" id="docsPanel" hidden>
         <h2 class="panel-title">⑦ 참여사업 관리 — 월별 서류 사전 점검</h2>
         <p class="muted">고용24 기업 로그인 → [참여사업 관리]에서 지원사업을 고르고, 매달 급여명세서·이체확인증을 올립니다. AI가 서류의 성명·귀속월·금액을 읽고, 규칙엔진이 <b>그 달 기준</b>으로 바로 점검합니다. 신청 시기가 되면 점검된 서류가 담당자 확인 대시보드로 넘어가 다시 낼 필요가 없습니다.</p>
@@ -308,7 +329,8 @@
 <div class="toast" id="toast" role="status" hidden></div>
 <footer class="footer"><div class="wrap">이음24 · AI 고용서비스 시제품 · 합성 데이터 시연 · 표시와 점검 결과는 참고용이며 최종 확인은 고용센터가 합니다.</div></footer>
 <script src="js/claimdocs.js"></script>
+<script src="js/hiredocs.js"></script>
 <script src="js/app.js"></script>
-<script>window.IeumDocs && window.IeumDocs.init()</script>
+<script>window.IeumDocs && window.IeumDocs.init(); if (window.IeumHireDocs) window.IeumHireDocs.init()</script>
 </body>
 </html>
