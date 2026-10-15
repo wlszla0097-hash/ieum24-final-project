@@ -21,7 +21,7 @@
    - 항목 빠짐·사업자번호 규칙·파일 연결 오류를 알려 주고(✖ = 꼭 고칠 것),
    - 일부러 넣은 오류 사례를 서비스 점검 기능이 실제로 잡는지 ✅/❌ 로 보여 줍니다(`expect`에 적은 기대 결과와 비교).
 3. **화면 확인**: `python3 dev_server.py` → http://127.0.0.1:3000
-   - 구직자 화면 '예시 불러오기'에 `seekers.json`의 구직자가, 기업 화면 예시 목록에 `work24_postings.xml`의 공고가 추가됩니다.
+   - 구직자 화면 '예시 불러오기'에 `seekers.json`·`seekers_A.json`·`seekers_B.json`의 구직자가, 기업 화면 예시 목록에 `work24_postings.xml`의 공고가 추가됩니다.
    - 공고에는 사업자번호로 기업 정보(피보험자 수·우선지원 여부)와 임금체불 조회 결과가 자동으로 붙습니다.
    - 브랜치에 올리면 PR의 미리보기 주소에서도 같은 화면을 볼 수 있습니다.
 4. 자동 테스트(`python3 -m pytest -q tests`)는 내장 데이터 기준으로 돌아가므로, 합성 파일을 바꿔도 깨지지 않습니다.
@@ -33,8 +33,8 @@
 | 1 | 고용24(한국고용정보원) | 채용정보 목록 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do | 팀원 | `data/synthetic/work24_postings.xml` |
 | 2 | 고용24(한국고용정보원) | 임금체불 명단공개 사업주 여부 (OpenAPI) | https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L41.do | 팀장 | `data/synthetic/work24_arrears.xml` |
 | 3 | 고용노동부(공개 문서) | 2026년 청년일자리도약장려금 사업운영 지침 | https://www.moel.go.kr/news/notice/noticeView.do?bbs_seq=20260400705 | 팀장 | `core/rules.py` (규칙DB) |
-| 4 | 모의데이터 | 구직자 참여 이력 (국민취업지원제도·청년도전지원사업) | - | 팀원 | `data/synthetic/seekers.json` |
-| 5 | 모의데이터 | 고용보험 피보험 이력 | - | 팀원 | `data/synthetic/seekers.json` (구직자별 `insurance`) |
+| 4 | 모의데이터 | 구직자 참여 이력 (국민취업지원제도·청년도전지원사업) | - | 팀원 | `data/synthetic/seekers_A.json`(지수) · `seekers_B.json`(홍주) |
+| 5 | 모의데이터 | 고용보험 피보험 이력 | - | 팀원 | 위 파일 안 구직자별 `insurance` |
 | 6 | 모의데이터 | 근로계약서 | https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20250300356 (표준근로계약서 참고) | 팀장 | `data/synthetic/contracts.json` |
 | 7 | 모의데이터 | 급여명세서 | - | 팀장 | `data/synthetic/docs/` + `docs_answer.json` |
 | 8 | 모의데이터 | 이체확인증 | - | 팀장 | `data/synthetic/docs/` + `docs_answer.json` |
@@ -106,7 +106,18 @@
 
 ## 3. 모의데이터 형식
 
-### 연번 4·5 · 구직자 `seekers.json` — 8~10명 (팀원)
+### 연번 4·5 · 구직자 — 8~10명 (팀원)
+
+**파일은 사람별로 나눕니다** (같은 파일을 둘이 고치면 합칠 때 충돌이 납니다).
+
+| 담당 | 파일 | id |
+|---|---|---|
+| 지수 | `data/synthetic/seekers_A.json` | P-A01, P-A02 … |
+| 홍주 | `data/synthetic/seekers_B.json` | P-B01, P-B02 … |
+| (기존 예시) | `data/synthetic/seekers.json` | 수정하지 않음 |
+
+- 파일은 `[]`(빈 목록)로 만들어 두었습니다. `[ ]` 안에 아래 형식의 `{ … }`를 쉼표로 이어 넣으면 됩니다.
+- 화면에는 세 파일이 자동으로 합쳐져 보입니다. id가 겹치면 점검 도구가 ✖로 알려 줍니다.
 
 현재 코드(`core/synthetic.py`의 `PERSONAS`)와 같은 구조입니다.
 

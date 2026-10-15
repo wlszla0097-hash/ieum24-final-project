@@ -123,5 +123,26 @@ def load_postings() -> list[dict]:
     return [enrich(p, companies, arrears) for p in parse_wanted(raw, source="synthetic_file")]
 
 
+def seeker_files() -> list[str]:
+    """구직자 파일 목록: seekers.json(기존 예시) + seekers_*.json(팀원별 파일, 예: seekers_A.json·seekers_B.json).
+    팀원마다 파일을 나눠 같은 파일을 동시에 고치다 생기는 충돌(conflict)을 막는다."""
+    if not os.path.isdir(DATA_DIR):
+        return []
+    extra = sorted(n for n in os.listdir(DATA_DIR) if n.startswith("seekers_") and n.endswith(".json"))
+    return (["seekers.json"] if os.path.exists(path("seekers.json")) else []) + extra
+
+
 def load_seekers() -> list[dict]:
-    return [p for p in load_json("seekers.json") if p.get("id") and p.get("alias")]
+    """모든 구직자 파일을 합친다. 한 파일에 형식 오류가 있어도 나머지 파일은 그대로 읽고, 같은 id는 먼저 읽은 것만 쓴다."""
+    out, seen = [], set()
+    for name in seeker_files():
+        try:
+            rows = load_json(name)
+        except (ValueError, UnicodeDecodeError) as e:
+            print(f"[data] {name} 읽기 실패 — {e}")
+            continue
+        for p in rows:
+            if isinstance(p, dict) and p.get("id") and p.get("alias") and p["id"] not in seen:
+                seen.add(p["id"])
+                out.append(p)
+    return out

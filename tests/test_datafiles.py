@@ -70,3 +70,24 @@ def test_hiredoc_reads_and_cross_checks():
     assert items["사업자등록증 · 임금체불 명단공개"] == "미충족"
     assert "사업자등록증 · 업종" in items and items["사업자등록증 · 업종"] == "충족"  # 업태·종목 단어가 겹치면 불일치 아님
     assert r["bizreg"]["busino"] == "0008100112" and "ceo" in r["bizreg"]
+
+
+def test_seekers_split_files_merge(tmp_path, monkeypatch):
+    """팀원별 파일(seekers_A·B)을 합쳐 읽고, 같은 id는 한 번만, 형식이 깨진 파일은 건너뛴다."""
+    import json
+    one = lambda i, a: {"id": i, "alias": a, "age": 25}  # noqa: E731
+    (tmp_path / "seekers.json").write_text(json.dumps([one("P-S01", "예시")]), encoding="utf-8")
+    (tmp_path / "seekers_A.json").write_text(json.dumps([one("P-A01", "가"), one("P-S01", "중복")]), encoding="utf-8")
+    (tmp_path / "seekers_B.json").write_text(json.dumps([one("P-B01", "나")]), encoding="utf-8")
+    (tmp_path / "seekers_C.json").write_text("[ {깨진 파일", encoding="utf-8")
+    monkeypatch.setattr(df, "DATA_DIR", str(tmp_path))
+    assert df.seeker_files() == ["seekers.json", "seekers_A.json", "seekers_B.json", "seekers_C.json"]
+    got = df.load_seekers()
+    assert [p["id"] for p in got] == ["P-S01", "P-A01", "P-B01"]
+    assert got[0]["alias"] == "예시"
+
+
+def test_member_seeker_files_exist_and_are_lists():
+    import json
+    for name in ("seekers_A.json", "seekers_B.json"):
+        assert isinstance(json.loads(Path(df.path(name)).read_text(encoding="utf-8")), list)

@@ -14,6 +14,13 @@
 - **사전 검증 결과**: [tools/eval_result.md](tools/eval_result.md) (재현: `python3 tools/eval_mvp.py`)
 - 모든 인물·공고·지원자·서류는 **합성(모의) 데이터**입니다. 실제 개인정보는 사용하지 않습니다.
 
+## 팀 작업 규칙
+
+- `main`에 직접 올리지 않습니다. 각자 브랜치(`seeker-data-이름`) → Pull Request, 합치기는 팀장이 합니다.
+- 구직자 합성데이터는 **사람별 파일**에만 넣습니다: 지수 `data/synthetic/seekers_A.json`(P-A01~), 홍주 `seekers_B.json`(P-B01~). `seekers.json`은 수정하지 않습니다.
+- PR 전 확인: `python3 tools/check_synthetic.py`(✖ 없음) · `python3 -m pytest -q tests`(모두 통과)
+- API 키는 `.env`(내 컴퓨터)와 Vercel 환경 변수에만 둡니다.
+
 ## 팀원 및 역할
 
 | 이름 | 역할 | 담당 업무 |
