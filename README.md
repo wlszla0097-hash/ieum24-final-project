@@ -6,6 +6,7 @@
 
 - **배포 URL**: https://ieum24-final-project.vercel.app
 - **시연·테스트 방법(최신)**: [docs/demo-guide.md](docs/demo-guide.md)
+- **점검 결과·결정안**: [docs/qa-review.md](docs/qa-review.md)
 - **서비스 기획서**: [docs/service-plan.md](docs/service-plan.md)
 - **공공데이터 활용 명세 · 합성데이터 작성 기준**: [docs/data-spec.md](docs/data-spec.md)
 - **AI 서류 판독 방식(발표용)**: [docs/ai-document-reading.md](docs/ai-document-reading.md)
@@ -90,6 +91,7 @@ cd <저장소 폴더>
 cp .env.example .env      # AI 키를 넣으면 AI 기능 동작, 비우면 규칙 기반 기본 문장으로 동작
 python3 dev_server.py     # → http://127.0.0.1:3000
 python3 -m pytest -q tests
+IEUM_E2E=1 python3 -m pytest -q tests/e2e   # 화면 전체 흐름 자동 테스트 (Playwright 필요, 약 2분)
 python3 tools/eval_mvp.py # 사전 검증 지표 재측정
 python3 tools/check_synthetic.py # data/synthetic 합성데이터 자가 점검 (docs/data-spec.md)
 python3 tools/make_seals.py      # 회사별 시연용 가상 법인 인장 PNG 다시 만들기 (Pillow 필요)
