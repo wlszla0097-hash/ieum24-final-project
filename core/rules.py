@@ -67,6 +67,11 @@ def judge(person: dict, post: dict, consent: bool) -> dict:
     base = {"badge": False, "eligible": False, "basis": GUIDE_YOUTH, "flags": flags}
     if post.get("emp_type") not in (None, "정규직"):
         return {**base, "type": "not_regular", "seeker_text": "정규직 공고가 아니라서 채용지원금 연계 대상이 아니에요."}
+    ind = str(post.get("industry") or "")
+    if any(w in ind for w in EXCLUDED_INDUSTRIES):  # 지원 제외 업종: 채용 공고는 추천하되 지원제도 표시는 하지 않음
+        return {**base, "type": "excluded_industry", "seeker_text": "이 기업은 채용지원금 지원 제외 업종이라 연계 대상이 아니에요. 채용 공고 자체는 지원할 수 있어요."}
+    if post.get("arrears") or post.get("tax_arrears"):
+        return {**base, "type": "company_restricted", "seeker_text": "이 기업은 지원 제한 사유(임금체불·체납)가 확인되어 채용지원금 연계 표시를 하지 않아요."}
     if post.get("priority") is False:
         return {**base, "type": "company_not_eligible", "seeker_text": "이 기업은 우선지원대상기업이 아니어서 채용지원금 연계가 어려울 수 있어 표시하지 않아요."}
     if cap is False:

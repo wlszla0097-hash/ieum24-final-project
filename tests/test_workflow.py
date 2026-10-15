@@ -130,3 +130,17 @@ def test_companies_collection_stored():
     store.put("companies", "C-0001234567", {"busino": "0001234567", "company": "바른정밀(가상)"})
     assert store.list_items("companies")[0]["company"] == "바른정밀(가상)"
     store.reset()
+
+
+def test_recommendation_excludes_tax_arrears_but_keeps_excluded_industry():
+    from match import rank
+    from rules import judge
+    base = {"region": "서울 강남구", "emp_type": "정규직", "priority": True, "wage": 2600000, "weekly_hours": 40, "skills": [], "close": "2099-12-31"}
+    bar = {**base, "id": "X1", "company": "라운지(가상)", "title": "매장 관리", "job": "매장 관리", "industry": "일반 유흥 주점업"}
+    tax = {**base, "id": "X2", "company": "건설(가상)", "title": "매장 관리", "job": "매장 관리", "industry": "건물 건설업", "tax_arrears": True}
+    picks, ex = rank([bar, tax], "매장 관리", "매장 관리", "무관")
+    assert [r["post"]["id"] for r in picks] == ["X1"] and ex["tax_arrears"] == 1  # 체납은 추천 제외, 제외 업종은 추천
+    person = {"age": 26, "programs": [{"type": "청년도전지원사업", "completed": "2026-05-29", "status": "수료"}], "insurance": []}
+    j = judge(person, bar, True)
+    assert j["badge"] is False and j["type"] == "excluded_industry"  # 지원제도 표시만 막음
+    assert judge(person, {**bar, "industry": "소프트웨어 개발 및 공급업"}, True)["badge"] is True
