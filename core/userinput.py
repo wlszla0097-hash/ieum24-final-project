@@ -132,7 +132,8 @@ def parse_posting(b: dict) -> dict:
     p["priority"] = {"예": True, "아니오": False}.get(text(b.get("priority"), 5))  # 모름 → None (확인 필요)
     p["arrears"] = None  # 임금체불 명단 여부는 사업자번호 조회 결과로 채움
     p["busino"] = "".join(ch for ch in str(b.get("busino") or "") if ch.isdigit())[:10]
-    p["industry"], p["tax_arrears"], p["lookup"] = "", False, None
+    # 업종: 공공데이터 조회 결과가 우선, 없으면 기업이 직접 등록한 값(이음24 가입 기업)
+    p["industry"], p["tax_arrears"], p["lookup"] = text(b.get("industry"), 40), False, None
     if p["busino"]:
         from datafiles import lookup_company
         info = lookup_company(p["busino"])

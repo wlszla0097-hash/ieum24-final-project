@@ -268,7 +268,7 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
 
 /* ---------- 4. 기업: 공고 올리기 (점검·AI 정리 → 게시) ----------
  * 회사 선택·공고 확인·지원자·채용 확정(근로계약서)·급여명세서는 workflow.js */
-const POST_FIELDS = ["busino", "company", "sido", "sigungu", "title", "job", "emp_type", "wage", "weekly_hours", "insured", "priority", "close", "description"];
+const POST_FIELDS = ["busino", "industry", "company", "sido", "sigungu", "title", "job", "emp_type", "wage", "weekly_hours", "insured", "priority", "close", "description"];
 const postEl = (k) => $(`#postForm [name="${k}"]`);
 ["p_wage", "p_insured"].forEach((id) => $("#" + id).addEventListener("input", (e) => {
   const n = e.target.value.replace(/[^\d]/g, ""); e.target.value = n ? Number(n).toLocaleString("ko-KR") : "";

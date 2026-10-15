@@ -126,7 +126,7 @@ def claimdoc(body: dict) -> dict:
     ps = {k: text(((issued if issued else ai.get("payslip")) or {}).get(k), 40) for k in PAYSLIP_KEYS}
     tr = {k: text((ai.get("transfer") or {}).get(k), 40) for k in TRANSFER_KEYS}
     ctx = body.get("ctx") if isinstance(body.get("ctx"), dict) else {}
-    ctx = {"worker": text(ctx.get("worker"), 20), "hire_date": text(ctx.get("hire_date"), 10), "weekly_hours": ctx.get("weekly_hours") or 40,
+    ctx = {"worker": text(ctx.get("worker"), 20), "company": text(ctx.get("company"), 40), "hire_date": text(ctx.get("hire_date"), 10), "weekly_hours": ctx.get("weekly_hours") or 40,
            "history": [{"ym": text(h.get("ym"), 7), "gross": h.get("gross")} for h in (ctx.get("history") or [])[:24] if isinstance(h, dict)]}
     return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "source": source, "model": model, "payslip_source": "issued" if issued else source,
             "check": check_month(month, ps, tr, ctx),

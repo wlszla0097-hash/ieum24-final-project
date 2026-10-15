@@ -434,3 +434,20 @@ dialog.doc-dlg { width: min(820px, 94vw); max-height: 90vh; }
   .ap-actions { align-items: stretch; }
 }
 @media (max-width: 760px) { .month-row { grid-template-columns: 1fr; } }
+
+/* 신규 기업 등록 · 이체확인증 대조 */
+.head-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.head-row .panel-title { margin-bottom: 0; }
+.co-new { margin: 12px 0; border: 2px dashed var(--brand); box-shadow: none; }
+.co-new h3 { margin-top: 0; }
+.co-card.user { border-color: var(--accent); }
+.co-note.ok { color: var(--ok); }
+.month-row.pay { grid-template-columns: 86px minmax(0, 1fr) minmax(0, 1.4fr); }
+.tr-attach { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; }
+.tr-attach select { max-width: 100%; font: inherit; font-size: 13px; padding: 5px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.tr-pend { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+.tr-pend img { width: 96px; border: 1px solid var(--line); border-radius: 6px; cursor: zoom-in; }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+table.cmp th, table.cmp td { border-bottom: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; }
+table.cmp th { color: var(--muted); font-weight: 600; }
+@media (max-width: 760px) { .month-row.pay { grid-template-columns: 1fr; } }

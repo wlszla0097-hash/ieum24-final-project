@@ -16,7 +16,7 @@ import urllib.request
 from common import ApiError
 
 PREFIX = "ieum24:demo:"
-COLLECTIONS = ("seekers", "applications", "postings", "contracts", "payslips", "cases")
+COLLECTIONS = ("seekers", "companies", "applications", "postings", "contracts", "payslips", "cases")
 TTL = 30 * 24 * 3600  # 30일
 MAX_VALUE = {"contracts": 200_000}  # 서명 이미지가 들어가는 계약서만 크게
 MAX_DEFAULT = 40_000

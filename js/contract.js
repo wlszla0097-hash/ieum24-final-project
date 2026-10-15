@@ -23,7 +23,7 @@ function defaults(post, worker, start) {
   const fixedTerm = post.emp_type === "계약직";
   const end = fixedTerm ? (() => { const d = new Date(start); d.setFullYear(d.getFullYear() + 1); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })() : "";
   return {
-    kind: fixedTerm ? "기간" : "무기", company: post.company, busino: post.busino || "", ceo: "대표이사 (가상)",
+    kind: fixedTerm ? "기간" : "무기", company: post.company, busino: post.busino || "", ceo: post.ceo ? `대표이사 ${post.ceo}` : "대표이사 (가상)",
     company_addr: `${post.region || ""} (가상 주소)`, worker: worker.name, worker_id: worker.id,
     start_date: start, end_date: end, place: `${post.company} ${post.region || ""} 사업장`, job: `${post.job || ""} — ${post.title || ""}`.replace(/^ — /, ""),
     t_start: "09:00", t_end: "18:00", b_start: "12:00", b_end: "13:00", days: 5, holiday: "일",
@@ -204,6 +204,36 @@ function payslipHtml(p) {
   </article>`;
 }
 
+/* ---------- 시연용 은행 이체확인증 (가상 은행 — 실제 은행 양식·상호 아님) ---------- */
+const BANKS = ["가람은행", "누리은행", "솔빛은행"];
+/** c: {bank, date, sender, recipient, amount, memo} → JPEG dataURL */
+function drawBankTransfer(c) {
+  const cv = document.createElement("canvas"); cv.width = 640; cv.height = 560; const g = cv.getContext("2d");
+  const F = (sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif`);
+  const bank = `${c.bank || BANKS[0]}(가상)`;
+  g.fillStyle = "#fff"; g.fillRect(0, 0, 640, 560);
+  g.fillStyle = "#14532d"; g.fillRect(0, 0, 640, 70);
+  g.fillStyle = "#fff"; g.textBaseline = "middle"; F(24, 1); g.fillText(bank, 28, 36);
+  F(13); g.textAlign = "right"; g.fillText("인터넷뱅킹 · 시연용 가상 은행", 612, 36); g.textAlign = "left";
+  g.fillStyle = "#111"; F(28, 1); g.textAlign = "center"; g.fillText("이 체 확 인 증", 320, 112); g.textAlign = "left";
+  const acct = (n) => `${n}-***-***${String(n * 7919).slice(-3)}`;
+  const rows = [["거래일시", `${c.date} 09:12:30`], ["출금계좌", acct(110)], ["보내는 분(예금주)", c.sender], ["입금은행", bank],
+    ["입금계좌", acct(352)], ["받는 분(예금주)", c.recipient], ["이체금액", `${won(c.amount)}원`], ["수수료", "0원"], ["받는 분 통장 표시", c.memo || "급여"], ["처리결과", "정상 처리"]];
+  g.strokeStyle = "#c9ced8"; g.lineWidth = 1;
+  rows.forEach(([k, v], i) => {
+    const y = 140 + i * 34;
+    g.fillStyle = i % 2 ? "#fff" : "#f4f7f4"; g.fillRect(28, y, 584, 34); g.strokeRect(28, y, 584, 34);
+    g.beginPath(); g.moveTo(190, y); g.lineTo(190, y + 34); g.stroke();
+    g.fillStyle = "#555"; F(14); g.fillText(k, 40, y + 17);
+    g.fillStyle = "#111"; F(k === "이체금액" ? 18 : 15, k === "이체금액" || k.startsWith("받는 분(") || k.startsWith("보내는")); g.fillText(v, 204, y + 17);
+  });
+  F(14); g.fillStyle = "#111"; g.textAlign = "center"; g.fillText("위와 같이 이체되었음을 확인합니다.", 320, 498);
+  F(12); g.fillStyle = "#888"; g.fillText(`${bank} · 합성 데이터 시연용 (실제 은행·거래 아님) · 계좌번호는 가림 처리`, 320, 532); g.textAlign = "left";
+  g.strokeStyle = "rgba(200,30,30,.85)"; g.lineWidth = 3; g.beginPath(); g.arc(560, 488, 30, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = "rgba(200,30,30,.85)"; F(11, 1); g.textAlign = "center"; g.fillText(c.bank || BANKS[0], 560, 482); g.fillText("(가상)", 560, 497); g.textAlign = "left";
+  return cv.toDataURL("image/jpeg", 0.9);
+}
+
 /** 문서 보기 창 (담당자·근로자 화면 공용) */
 function view(title, html) {
   const dlg = document.createElement("dialog"); dlg.className = "doc-dlg";
@@ -215,5 +245,5 @@ function view(title, html) {
   return dlg;
 }
 
-window.IeumContract = { defaults, hours, toCheck, docHtml, sealFor, drawSeal, openSign, synthPay, payslipHtml, view, safeImg, fmtBiz };
+window.IeumContract = { drawBankTransfer, BANKS, defaults, hours, toCheck, docHtml, sealFor, drawSeal, openSign, synthPay, payslipHtml, view, safeImg, fmtBiz };
 })();

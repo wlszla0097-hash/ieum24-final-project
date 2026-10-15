@@ -34,6 +34,14 @@ def _name(v) -> str:
     return "".join(str(v or "").split())
 
 
+def _corp(v) -> str:
+    """회사명 비교용: 공백·(가상)·주식회사·(주) 표기를 뺀다."""
+    s = _name(v)
+    for w in ("(가상)", "주식회사", "(주)", "㈜"):
+        s = s.replace(w, "")
+    return s
+
+
 def months_between(start_ym: str, end_ym: str) -> list[str]:
     """start_ym ~ end_ym (둘 다 포함) 월 목록."""
     y, m = map(int, start_ym.split("-"))
@@ -63,6 +71,16 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
         add(MISMATCH, "성명", f"명세서 {payslip.get('name')} ≠ 이체 받는 분 {transfer.get('recipient')}")
     else:
         add(MATCH, "성명", f"{payslip.get('name') or transfer.get('recipient')} — 명세서·이체확인증 일치")
+
+    company = _corp(ctx.get("company"))
+    if company:  # 이체자(보내는 분) = 사업주(회사) 명의인지 — 회사명을 알 때만 점검
+        sender = _corp(transfer.get("sender"))
+        if not sender:
+            add(CHECK, "이체자(보내는 분)", "이체확인증에서 보내는 분을 읽지 못함 — 원본 확인")
+        elif company in sender or sender in company:
+            add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 사업주(회사) 명의 계좌에서 이체")
+        else:
+            add(CHECK, "이체자(보내는 분)", f"보내는 분 {transfer.get('sender')} ≠ 회사 {ctx.get('company')} — 대표자 개인 계좌 등 사업주 명의가 아닌 지급인지 확인")
 
     p_ym = _ym(payslip.get("ym"))
     add(MATCH if p_ym == month else MISMATCH if p_ym else CHECK, "귀속월",

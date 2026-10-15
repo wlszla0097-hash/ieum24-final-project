@@ -49,10 +49,18 @@ async function seekerInbox() {
     const me = S.me();
     const [sk, apps, cts, pays] = await Promise.all([S.get("seekers", me), S.list("applications"), S.list("contracts"), S.list("payslips")]);
     const myApps = apps.filter((a) => a.seeker_id === me), myCts = cts.filter((c) => c.seeker_id === me), myPays = pays.filter((p) => p.seeker_id === me);
-    if (!sk && !myApps.length) { box.hidden = true; return; }
+    const all = await S.list("seekers");
+    if (!sk && !myApps.length && !all.length) { box.hidden = true; return; }
     box.hidden = false;
     const empty = !$("#seekForm [name=experience]").value.trim();
-    box.innerHTML = `<h2 class="panel-title">📥 내 서류함 — ${esc((sk && sk.alias) || "구직자")} <small class="muted">${esc(S.label())}</small></h2>
+    const switcher = `<div class="btn-row"><span class="muted">저장된 구직자 ${all.length}명</span>
+      ${all.length ? `<select id="mdSwitch" aria-label="저장된 구직자로 바꾸기"><option value="">저장된 구직자로 바꾸기…</option>${all.map((x) => `<option value="${esc(x.id)}" ${x.id === me ? "selected" : ""}>${esc(x.alias || "구직자")} · ${esc(String(x.updated || "").slice(0, 10))}</option>`).join("")}</select>` : ""}
+      <button class="btn ghost sm" type="button" id="mdNew">+ 새 구직자로 작성 (시연)</button></div>`;
+    if (!sk && !myApps.length) {
+      box.innerHTML = `<h2 class="panel-title">📥 내 서류함 <small class="muted">${esc(S.label())}</small></h2>${switcher}<p class="muted">지금은 새 구직자입니다. 아래에 이력을 입력해 저장하세요.</p>`;
+      bindSwitch(box); return;
+    }
+    box.innerHTML = `<h2 class="panel-title">📥 내 서류함 — ${esc((sk && sk.alias) || "구직자")} <small class="muted">${esc(S.label())}</small></h2>${switcher}
       ${sk && empty ? `<p class="muted">저장된 내 이력이 있어요. <button class="btn ghost sm" type="button" id="mdLoad">저장된 이력 불러오기</button></p>` : ""}
       <div class="md-grid">
         <div><h4>지원 현황 ${myApps.length}건</h4>${myApps.map((a) => `<div class="md-row"><b>${esc(a.company)}</b><span class="muted">${esc(a.title)} · 지원 ${esc(a.applied)}</span>${badge(a.status === "채용 확정" ? "채용 확정" : "지원")}</div>`).join("") || '<p class="muted">아직 지원한 공고가 없어요.</p>'}</div>
@@ -61,6 +69,7 @@ async function seekerInbox() {
         <div><h4>급여명세서 ${myPays.length}건</h4>${myPays.sort((x, y) => x.ym.localeCompare(y.ym)).map((p) => `<div class="md-row"><b>${esc(p.ym)}</b><span class="muted">${esc(p.company)} · 실지급 ${won(p.net)}</span>
             <span>${p.check ? badge(p.check.level) : '<span class="badge 안내">이체 확인 전</span>'} <button class="btn ghost sm" type="button" data-ps="${esc(p.id)}">보기</button></span></div>`).join("") || '<p class="muted">입사 후 회사가 발급한 명세서가 여기로 옵니다.</p>'}</div>
       </div>`;
+    bindSwitch(box);
     const load = $("#mdLoad", box);
     if (load) load.onclick = () => { fillForm($("#seekForm"), sk.profile, SEEK_FIELDS.filter((k) => k in sk.profile)); syncProgramBoxes();
       Object.assign(state, { points: sk.points || [], portfolio: sk.portfolio || "", headline: sk.headline || "" }); toast("저장된 이력을 불러왔어요. [AI로 이력 정리 · 공고 추천]을 누르면 추천이 다시 나와요."); load.closest("p").remove(); };
@@ -76,46 +85,115 @@ async function seekerInbox() {
     }));
   } catch (err) { box.hidden = false; box.innerHTML = `<p class="msg error">${esc(err.message)}</p>`; }
 }
+/** 저장된 구직자 바꾸기 / 새 구직자로 시작: 여러 구직자 데이터가 쌓이는 것을 한 브라우저에서 시연 */
+function bindSwitch(box) {
+  const clear = () => {
+    $("#seekForm").reset(); syncProgramBoxes();
+    Object.assign(state, { profile: null, points: [], portfolio: "", headline: "", jobs: [], cert: null });
+    $("#seekResult").innerHTML = '<div class="empty"><span>🧭</span><p>왼쪽에 내 경험을 적고<br>[AI로 이력 정리 · 공고 추천]을 누르세요.</p></div>';
+  };
+  const nw = $("#mdNew", box);
+  if (nw) nw.onclick = () => { S.newMe(); clear(); seekerInbox(); toast("새 구직자로 시작해요. 앞서 저장한 구직자 데이터는 그대로 남아 있어요."); };
+  const sw = $("#mdSwitch", box);
+  if (sw) sw.onchange = () => { if (!sw.value || sw.value === S.me()) return; S.newMe(sw.value); clear(); seekerInbox(); };
+}
 async function signContract(c, r) {
   Object.assign(c, { worker_sign: r.data, sign_kind: r.kind, signed_at: new Date().toISOString(), status: "체결 완료" });
   await S.put("contracts", c.id, c);
   if (c.case_id) { const cs = await S.get("cases", c.case_id); if (cs) await S.put("cases", cs.id, { ...cs, contract_status: c.status, sign_kind: r.kind }); }
 }
 
-/* ================= 기업: 회사 선택 ================= */
+/* ================= 기업: 회사 선택 · 신규 등록 ================= */
 async function enterEmployer() {
   await S.init();
   $("#storeMode").textContent = `저장 방식: ${S.label()}`;
   try {
     if (!E.companies) { const r = await api("/api/employer", { timeoutMs: 15000 }); E.companies = r.companies; state.postExamples = r.examples; }
   } catch (err) { $("#coGrid").innerHTML = errorHtml(err); return; }
+  E.userCos = await S.list("companies").catch(() => []);
   if (E.co) return showWork(false);
   renderCompanies();
 }
+/** 직접 등록한 기업(저장소) + 공공데이터(합성) 연결 기업 + 기본 예시 기업 */
+function allCos() {
+  const user = (E.userCos || []).map((c) => ({ ...c, key: c.id, user: true, registered: true, postings: [] }));
+  return [...user.sort((a, b) => String(b.created).localeCompare(String(a.created))), ...(E.companies || [])];
+}
 async function renderCompanies() {
   $("#empCompanies").hidden = false; $("#empWork").hidden = true;
+  E.userCos = await S.list("companies").catch(() => []);
   const [apps, posts] = await Promise.all([S.list("applications").catch(() => []), S.list("postings").catch(() => [])]);
   const ids = (co) => new Set([...co.postings.map((p) => p.id), ...posts.filter((p) => p.co_key === co.key).map((p) => p.id)]);
   const card = (co) => { const set = ids(co), n = apps.filter((a) => set.has(a.posting_id)).length;
-    return `<button class="co-card" type="button" data-key="${esc(co.key)}"><b>${esc(co.company)}</b>
+    return `<button class="co-card ${co.user ? "user" : ""}" type="button" data-key="${esc(co.key)}"><b>${esc(co.company)}</b>
       <span class="muted">${esc(co.industry || "업종 미등록")} · ${esc(co.region)}</span>
       <span class="muted">${co.busino ? `사업자 ${esc(C.fmtBiz(co.busino))}` : "사업자번호 없음"} · 공고 ${set.size}건${n ? ` · <b class="hl">지원자 ${n}명</b>` : ""}</span>
-      ${co.note ? `<small class="co-note">시연 사례: ${esc(co.note)}</small>` : ""}</button>`; };
-  $("#coGrid").innerHTML = E.companies.filter((c) => c.registered).map(card).join("") || '<p class="muted">등록된 합성 기업이 없습니다.</p>';
-  $("#coGridEtc").innerHTML = E.companies.filter((c) => !c.registered).map(card).join("");
+      ${co.user ? `<small class="co-note ok">직접 등록 · ${esc(co.created || "")}</small>` : co.note ? `<small class="co-note">시연 사례: ${esc(co.note)}</small>` : ""}</button>`; };
+  const cos = allCos();
+  $("#coGridUser").innerHTML = cos.filter((c) => c.user).map(card).join("");
+  $("#coUserHead").hidden = !cos.some((c) => c.user);
+  $("#coGrid").innerHTML = cos.filter((c) => c.registered && !c.user).map(card).join("") || '<p class="muted">등록된 합성 기업이 없습니다.</p>';
+  $("#coGridEtc").innerHTML = cos.filter((c) => !c.registered).map(card).join("");
   $$(".co-card").forEach((b) => (b.onclick = () => selectCompany(b.dataset.key)));
+  stats();
+}
+/** 저장 현황: 화면에서 입력한 데이터가 쌓이고 있는지 한눈에 */
+async function stats() {
+  const el = $("#storeStats"); if (!el) return;
+  try {
+    const d = await S.dump();
+    el.innerHTML = `저장 현황 — 구직자 <b>${d.seekers.length}</b>명 · 직접 등록 기업 <b>${d.companies.length}</b>곳 · 게시 공고 <b>${d.postings.length}</b>건 · 지원 <b>${d.applications.length}</b>건 · 근로계약서 <b>${d.contracts.length}</b>건 · 급여명세서 <b>${d.payslips.length}</b>건 · 신청 건 <b>${d.cases.length}</b>건`;
+  } catch (err) { el.textContent = err.message; }
 }
 async function selectCompany(key) {
-  E.co = E.companies.find((c) => c.key === key); E.sel = null; E.ct = null;
-  E.seal = await C.sealFor(E.co.busino, E.co.company);
+  E.co = allCos().find((c) => c.key === key); E.sel = null; E.ct = null;
+  E.seal = C.safeImg(E.co.seal) || await C.sealFor(E.co.busino, E.co.company);
   showWork(true);
 }
+
+/* 신규 기업 등록 (실제 서비스의 기업 회원가입 자리) */
+$("#coNewBtn").onclick = () => { const f = $("#coNew"); f.hidden = !f.hidden; if (!f.hidden) $("#cn_name").focus(); };
+$("#cnCancel").onclick = () => ($("#coNew").hidden = true);
+$("#cn_ins").addEventListener("input", (e) => (e.target.value = e.target.value.replace(/[^\d]/g, "")));
+$("#coNew").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("#cnMsg"), v = (id) => $("#" + id).value.trim();
+  const busino = v("cn_busino").replace(/\D/g, "");
+  const miss = [["cn_name", "회사명"], ["cn_busino", "사업자등록번호"], ["cn_ind", "업종"], ["cn_sido", "소재지 시·도"], ["cn_ins", "피보험자 수"]].filter(([id]) => !v(id));
+  if (miss.length) return showMsg(msg, `필수값을 입력하세요: ${miss.map(([, l]) => l).join(", ")}`);
+  if (busino.length !== 10 || !busino.startsWith("000")) return showMsg(msg, "시연용 사업자등록번호는 000으로 시작하는 숫자 10자리만 쓸 수 있어요. (실제 번호 입력 금지)");
+  if (allCos().some((c) => c.busino === busino)) return showMsg(msg, "이미 등록된 사업자등록번호예요. 목록에서 그 회사를 고르세요.");
+  showMsg(msg, "");
+  const name = v("cn_name").replace(/\(가상\)/g, "").trim();
+  const btn = $("#cnSave"); btn.disabled = true; btn.textContent = "등록 중…";
+  try {
+    const seal = C.drawSeal("대표이사", { ring: `주식회사 ${name} · 시연용 가상 인장 · `, size: 160 });
+    const co = await S.put("companies", `C-${busino}`, { busino, company: `${name}(가상)`, ceo: v("cn_ceo"), industry: v("cn_ind"),
+      region: [v("cn_sido"), v("cn_sgg")].filter(Boolean).join(" "), insured: Number(v("cn_ins")), priority: { 예: true, 아니오: false }[v("cn_pri")] ?? null,
+      seal, created: today() });
+    $("#coNew").reset(); $("#coNew").hidden = true;
+    toast(`${esc(co.company)}을(를) 등록했어요. 법인 인장(가상)도 만들어 저장했어요.`);
+    E.userCos = await S.list("companies");
+    selectCompany(co.id);
+  } catch (err) { showMsg(msg, err.message); }
+  finally { btn.disabled = false; btn.textContent = "등록하고 시작하기"; }
+});
+/* 저장 데이터 내보내기: 쌓인 시연 데이터를 JSON 파일로 받아 저장소(data/)에 올릴 수 있게 */
+$("#storeExport").onclick = async () => {
+  try {
+    const d = await S.dump();
+    const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), note: "이음24 시연 데이터(합성)", ...d }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ieum24-demo-data-${today()}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (err) { toast(esc(err.message)); }
+};
+
 function showWork(fresh) {
   $("#empCompanies").hidden = true; $("#empWork").hidden = false;
   const co = E.co;
   $("#coBar").innerHTML = `<div class="co-bar-in"><img class="co-seal" src="${esc(C.safeImg(E.seal))}" alt="법인 인장(가상)">
-    <div><h2>${esc(co.company)}</h2><p class="muted">${esc(co.industry || "업종 미등록")} · ${esc(co.region)} · 사업자등록번호 ${esc(C.fmtBiz(co.busino))} · 피보험자 ${esc(co.insured ?? "-")}명 · 우선지원대상 ${co.priority === true ? "예" : co.priority === false ? "아니오" : "모름"}</p>
-      <small class="muted">법인 인장 등록됨 (시연용 가상 인장) — 근로계약서 사업주 날인에 자동으로 쓰입니다.</small></div>
+    <div><h2>${esc(co.company)} ${co.user ? '<span class="badge 안내">직접 등록</span>' : ""}</h2><p class="muted">${esc(co.industry || "업종 미등록")} · ${esc(co.region)} · 사업자등록번호 ${esc(C.fmtBiz(co.busino))} · 피보험자 ${esc(co.insured ?? "-")}명 · 우선지원대상 ${co.priority === true ? "예" : co.priority === false ? "아니오" : "모름"}${co.ceo ? ` · 대표 ${esc(co.ceo)}` : ""}</p>
+      <small class="muted">법인 인장 등록됨 (시연용 가상 인장) — 근로계약서 사업주 날인에 자동으로 쓰입니다.${co.user ? " 직접 등록한 기업은 공공데이터(합성) 조회 결과가 없어 업종은 입력값으로, 임금체불은 '연동 후 확인'으로 점검합니다." : ""}</small></div>
     <button class="btn ghost sm" type="button" id="coChange">다른 회사 선택</button></div>`;
   $("#coChange").onclick = () => { E.co = null; ["contractPanel", "payPanel", "hiredocPanel", "empArea"].forEach((id) => ($("#" + id).hidden = true)); renderCompanies(); window.scrollTo({ top: 0 }); };
   if (fresh) {
@@ -135,7 +213,7 @@ $$("[data-etab]").forEach((b) => (b.onclick = () => tab(b.dataset.etab)));
 function prepPostForm() {
   const co = E.co, [sido, ...rest] = String(co.region || "").split(" ");
   $("#postForm").reset();
-  fillPost({ company: co.company, busino: co.busino ? C.fmtBiz(co.busino) : "", sido, sigungu: rest.join(" "), insured: co.insured ?? "",
+  fillPost({ company: co.company, busino: co.busino ? C.fmtBiz(co.busino) : "", industry: co.user ? co.industry : "", sido, sigungu: rest.join(" "), insured: co.insured ?? "",
     priority: co.priority === true ? "예" : co.priority === false ? "아니오" : "모름", weekly_hours: 40 });
   $("#postExample").innerHTML = '<option value="">불러오기…</option>' + co.postings.map((p) => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join("");
   renderPreview();
@@ -163,7 +241,11 @@ function renderPreview() {
 }
 function publishBox(data) {
   const { check, analysis } = data;
-  const skills = (analysis && analysis.requirements) || [];
+  // 요구 역량: AI가 본문에서 찾은 단어. AI 키가 없으면 기존 공고들의 기술 단어 중 본문에 실제로 있는 것만 (추천 매칭용)
+  const body = `${state.postInput.title} ${state.postInput.job} ${state.postInput.description}`.toLowerCase();
+  const vocab = [...new Set((E.companies || []).flatMap((c) => c.postings.flatMap((p) => p.skills || [])))];
+  const skills = (analysis && analysis.requirements && analysis.requirements.length) ? analysis.requirements
+    : vocab.filter((w) => w && body.includes(String(w).toLowerCase())).slice(0, 8);
   $("#postPublish").innerHTML = `<h2 class="panel-title">게시 전 확인 — 구직자에게 이렇게 보여요</h2>
     ${jobCard(state.postInput, { skills, summary: analysis && analysis.summary })}
     ${check.verdict === "연계 어려움" ? '<p class="msg info">지원제도 연계는 어렵다고 점검됐어요. 공고 게시는 할 수 있지만, 왼쪽 점검 항목을 먼저 확인하세요.</p>' : ""}
@@ -251,7 +333,7 @@ async function hire(a) {
     const sk = a.stored ? extra.find((x) => x.seeker_id === a.seeker_id) : null;
     E.ct = { id, posting_id: p.id, posting_title: p.title, applicant_id: a.id, seeker_id: a.seeker_id || "", worker: a.hire_name,
       company: E.co.company, busino: E.co.busino, posting_form: p.form, applicant: sk ? { alias: sk.alias, profile: sk.profile } : null,
-      fields: C.defaults({ ...data.posting, busino: E.co.busino, job: p.form.job, region: data.posting.region }, { id: a.seeker_id || `SYN-${a.id}`, name: a.hire_name }, today()),
+      fields: C.defaults({ ...data.posting, busino: E.co.busino, job: p.form.job, region: data.posting.region, ceo: E.co.ceo || "" }, { id: a.seeker_id || `SYN-${a.id}`, name: a.hire_name }, today()),
       status: "작성 중" };
   }
   renderContract();
@@ -372,23 +454,59 @@ async function showCtResult() {
 /* ================= 급여명세서 발급 · 이체 확인 ================= */
 function payMonths() { const s = String(E.ct.fields.start_date).slice(0, 7); return Array.from({ length: 6 }, (_, i) => ymAdd(s, i)); }
 const psId = (ym) => `PS~${E.ct.id.slice(3)}~${ym}`;
+/* 이체확인증 예시: 가상 은행 양식으로 그려 '첨부'한 것처럼 쓰고, AI(또는 키가 없으면 그릴 때 기록한 값)로 판독해 대조 */
+const TR_CASES = {
+  ok: "정상 — 금액·보내는 분·받는 분 모두 일치",
+  short: "금액 다름 — 3만 원 적게 이체",
+  sender: "이체자 다름 — 대표자 개인 명의 계좌에서 이체",
+  recipient: "받는 분 다름 — 근로자가 아닌 다른 사람 계좌",
+};
+const BATCH = ["ok", "ok", "ok", "short", "ok", "sender"];
+function makeExample(p, kind, i = 0) {
+  const ceo = String(E.ct.fields.ceo || "").replace(/대표이사|\(가상\)/g, "").trim() || "김대표";
+  const t = { bank: C.BANKS[i % C.BANKS.length], date: p.pay_date, sender: kind === "sender" ? ceo : p.company,
+    recipient: kind === "recipient" ? "박서연" : p.worker, amount: p.net - (kind === "short" ? 30000 : 0), memo: `${Number(p.ym.slice(5))}월 급여` };
+  const url = C.drawBankTransfer(t);
+  return { src: url, label: `예시: ${TR_CASES[kind]}`, kind, file: { media_type: "image/jpeg", data: url.split(",")[1] },
+    truth: { transfer: { recipient: t.recipient, date: t.date, amount: String(t.amount), sender: t.sender } } };
+}
+/** 기준값(명세서·계약) ↔ 이체확인증 판독값 비교표 */
+function compareHtml(p) {
+  const r = (p.transfer && p.transfer.read) || {}, items = (p.check && p.check.items) || [];
+  const lv = (name) => { const it = items.find((x) => x.item === name); return it ? badge(it.level) : '<span class="badge 안내">참고</span>'; };
+  const rows = [["받는 분(예금주)", `근로자 ${p.worker}`, r.recipient, "성명"], ["보내는 분(이체자)", `회사 ${p.company}`, r.sender, "이체자(보내는 분)"],
+    ["이체금액", `명세서 실지급 ${won(p.net)}`, r.amount ? won(num(r.amount)) : "", "실지급액·이체액"], ["이체일", `지급일 ${p.pay_date}`, r.date, "이체일"]];
+  const rest = items.filter((x) => !["성명", "이체자(보내는 분)", "실지급액·이체액", "이체일"].includes(x.item));
+  return `<table class="cmp"><thead><tr><th>항목</th><th>기준</th><th>이체확인증 판독</th><th></th></tr></thead><tbody>
+    ${rows.map(([k, base, read, item]) => `<tr><td>${esc(k)}</td><td>${esc(base)}</td><td><b>${esc(read || "읽지 못함")}</b></td><td>${lv(item)}</td></tr>`).join("")}</tbody></table>
+    ${items.filter((x) => x.level !== "일치").map((x) => `<div class="muted">· ${esc(x.item)}: ${esc(x.detail)}</div>`).join("")}
+    ${rest.length ? `<details><summary>그 밖의 규칙 점검 ${rest.length}항목</summary>${checkList(rest)}</details>` : ""}
+    <small class="muted">${esc(p.transfer.kind || "")} · 판독: ${esc(p.transfer.read_source === "ai" ? `AI ${p.transfer.model || ""}` : "예시 이체확인증을 그릴 때 기록한 값 — AI 키 미설정 환경")}</small>`;
+}
 async function openPay() {
   const ct = E.ct; if (!ct || !ct.case_id) return toast("먼저 근로계약서를 저장하세요.");
   const panel = $("#payPanel"), f = ct.fields;
-  panel.hidden = false;
+  panel.hidden = false; E.pending = {};
   const gross = num(f.base_wage) + num(f.allow_amount);
-  panel.innerHTML = `<h2 class="panel-title">⑦ 급여명세서 발급 · 이체 확인 <small class="muted">${esc(f.worker)} · ${esc(ct.company)}</small></h2>
+  panel.innerHTML = `<h2 class="panel-title">⑦ 급여명세서 발급 · 이체확인증 대조 <small class="muted">${esc(f.worker)} · ${esc(ct.company)}</small></h2>
     <p class="muted">근로계약서 조건(월급 ${won(num(f.base_wage))}${num(f.allow_amount) ? ` + ${esc(f.allow_name || "고정수당")} ${won(num(f.allow_amount))}` : ""} · 매월 ${esc(f.payday)}일 지급)으로 임금명세서를 발급하면 근로자 [내 서류함]으로 바로 전송됩니다.
-      이체확인증은 은행이 발급하는 서류라 기업이 올리면, AI가 받는 분·금액·날짜만 읽어 명세서 실지급액과 대조합니다(파일은 저장하지 않고 판독값만 기록).</p>
-    <div class="btn-row"><button class="btn primary" type="button" id="payAll">6개월분 발급 + 합성 이체확인증 대조 (시연)</button>
-      <span class="muted">지급총액 ${won(gross)} · 4번째 달은 이체액이 3만 원 적은 오류 사례로 넣습니다.</span></div>
+      이체확인증은 은행이 발급하는 서류라 기업이 <b>첨부</b>하면, AI가 <b>이체금액·보내는 분(이체자)·받는 분(예금주)·이체일</b>을 읽어 명세서·계약과 대조합니다. 파일은 저장하지 않고 판독값만 기록합니다.</p>
+    <p class="meta">시연: [예시 선택]에서 사례를 고르면 가상 은행 양식의 이체확인증 이미지가 만들어져 첨부됩니다. 직접 만든 이미지·PDF도 [내 파일 첨부]로 올릴 수 있어요(AI 키가 있어야 판독).</p>
+    <div class="btn-row"><button class="btn primary" type="button" id="payAll">6개월분 발급 + 예시 이체확인증 대조 (시연)</button>
+      <span class="muted">지급총액 ${won(gross)} · 4번째 달 금액 다름, 6번째 달 이체자 다름 사례가 섞여 있어요.</span></div>
     <div id="payRows"></div><div id="paySum"></div>`;
   await drawPayRows();
   $("#payAll").onclick = async () => {
     const b = $("#payAll"); b.disabled = true;
-    try { for (const [i, ym] of payMonths().entries()) await transfer(ym, i === 3 ? "short" : "ok", null, true); await syncCase(true);
-      toast(`6개월분 명세서를 근로자에게 보내고 이체 대조를 마쳤어요. <a href="#officer">담당자 확인 대시보드</a>에 반영됐어요.`); }
-    catch (err) { toast(esc(err.message)); }
+    try {
+      for (const [i, ym] of payMonths().entries()) {
+        let p = await S.get("payslips", psId(ym)); if (!p) p = await issue(ym);
+        E.pending[ym] = makeExample(p, BATCH[i], i);
+        await transfer(ym, true);
+      }
+      await syncCase(true);
+      toast(`6개월분 명세서를 근로자에게 보내고 이체확인증 대조를 마쳤어요. <a href="#officer">담당자 확인 대시보드</a>에 반영됐어요.`);
+    } catch (err) { toast(esc(err.message)); }
     finally { b.disabled = false; drawPayRows(); }
   };
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -396,21 +514,28 @@ async function openPay() {
 async function drawPayRows() {
   const pays = Object.fromEntries((await S.list("payslips")).filter((p) => p.contract_id === E.ct.id).map((p) => [p.ym, p]));
   const now = today();
-  $("#payRows").innerHTML = payMonths().map((ym) => { const p = pays[ym];
-    return `<div class="month-row" data-ym="${ym}"><div class="mth">${Number(ym.slice(5))}월분<small>${ym}${p ? ` · 지급 ${esc(p.pay_date)}${p.pay_date > now ? " (미리 발급·시연)" : ""}` : ""}</small></div>
+  $("#payRows").innerHTML = payMonths().map((ym) => { const p = pays[ym], pend = E.pending[ym];
+    return `<div class="month-row pay" data-ym="${ym}"><div class="mth">${Number(ym.slice(5))}월분<small>${ym}${p ? ` · 지급 ${esc(p.pay_date)}${p.pay_date > now ? " (미리 발급·시연)" : ""}` : ""}</small></div>
       <div>${p ? `<b>실지급 ${won(p.net)}</b> <button class="btn ghost sm" type="button" data-view="${ym}">명세서 보기</button> <span class="badge 적정">근로자에게 전송됨</span>`
         : `<button class="btn ghost sm" type="button" data-issue="${ym}">명세서 발급·전송</button>`}
-        <div class="btn-row sm-gap"><button class="btn ghost sm" type="button" data-tr="ok" data-ym="${ym}">합성 이체확인증(정상)</button>
-          <button class="btn ghost sm" type="button" data-tr="short" data-ym="${ym}">합성(금액 다름)</button>
-          <label class="btn ghost sm">이체확인증 첨부<input type="file" accept="image/*,application/pdf" data-trfile="${ym}" hidden></label></div></div>
-      <div data-res>${p && p.check ? `${badge(p.check.level)} ${p.check.items.filter((i) => i.level !== "일치").map((i) => `<div class="muted">${esc(i.item)}: ${esc(i.detail)}</div>`).join("") || '<span class="muted">명세서·이체확인증 일치</span>'}
-        <small class="muted">이체 판독: ${esc(p.transfer.read_source === "ai" ? `AI ${p.transfer.model || ""}` : "합성 서류 기록값 — AI 미연결 환경")}</small>` : '<span class="muted">이체확인증을 올리면 대조합니다.</span>'}</div></div>`; }).join("");
-  $$("[data-issue]").forEach((b) => (b.onclick = async () => { b.disabled = true; await issue(b.dataset.issue); await syncCase(false); drawPayRows(); }));
-  $$("[data-view]").forEach((b) => (b.onclick = () => { const p = pays[b.dataset.view]; C.view(`${p.ym} 임금명세서`, C.payslipHtml(p)); }));
-  $$("[data-tr]").forEach((b) => (b.onclick = async () => { b.disabled = true; await transfer(b.dataset.ym, b.dataset.tr); b.disabled = false; }));
-  $$("[data-trfile]").forEach((inp) => (inp.onchange = async () => { const fl = inp.files[0]; if (!fl) return;
+        <div class="tr-attach"><b>이체확인증 첨부</b>
+          <div class="btn-row sm-gap"><select data-ex="${ym}" aria-label="예시 이체확인증 선택"><option value="">예시 선택…</option>${Object.entries(TR_CASES).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>
+            <label class="btn ghost sm">내 파일 첨부<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" data-trfile="${ym}" hidden></label></div>
+          ${pend ? `<div class="tr-pend">${pend.src ? `<img src="${esc(pend.src)}" alt="첨부한 이체확인증" data-zoom>` : '<span class="badge 안내">PDF</span>'}<div><small>${esc(pend.label)}</small><br>
+            <button class="btn primary sm" type="button" data-run="${ym}">AI 판독 · 대조</button></div></div>` : ""}</div></div>
+      <div data-res>${p && p.check ? `${badge(p.check.level)} ${compareHtml(p)}` : '<span class="muted">이체확인증을 첨부하고 [AI 판독 · 대조]를 누르세요.</span>'}</div></div>`; }).join("");
+  $$("#payRows [data-issue]").forEach((b) => (b.onclick = async () => { b.disabled = true; await issue(b.dataset.issue); await syncCase(false); drawPayRows(); }));
+  $$("#payRows [data-view]").forEach((b) => (b.onclick = () => { const p = pays[b.dataset.view]; C.view(`${p.ym} 임금명세서`, C.payslipHtml(p)); }));
+  $$("#payRows [data-ex]").forEach((sel) => (sel.onchange = async () => { if (!sel.value) return; const ym = sel.dataset.ex;
+    let p = pays[ym] || await S.get("payslips", psId(ym)); if (!p) p = await issue(ym);
+    E.pending[ym] = makeExample(p, sel.value, payMonths().indexOf(ym)); drawPayRows(); }));
+  $$("#payRows [data-trfile]").forEach((inp) => (inp.onchange = async () => { const fl = inp.files[0]; if (!fl) return;
     if (fl.size > 3 * 1024 * 1024) return toast("3MB 이하 파일만 올릴 수 있어요.");
-    await transfer(inp.dataset.trfile, "file", await window.IeumDocs.fileToB64(fl)); }));
+    const file = await window.IeumDocs.fileToB64(fl);
+    E.pending[inp.dataset.trfile] = { file, src: file.media_type.startsWith("image/") ? `data:${file.media_type};base64,${file.data}` : "", label: `내 파일: ${fl.name}`, kind: "file" };
+    drawPayRows(); }));
+  $$("#payRows [data-run]").forEach((b) => (b.onclick = async () => { b.disabled = true; await transfer(b.dataset.run); }));
+  $$("#payRows [data-zoom]").forEach((im) => (im.onclick = () => C.view("첨부한 이체확인증", `<img src="${esc(im.src)}" alt="이체확인증" style="max-width:100%">`)));
   summary(Object.values(pays));
 }
 async function issue(ym) {
@@ -421,26 +546,22 @@ async function issue(ym) {
     monthly_hours: monthlyHours(C.hours(f).weekly || 40), emp_no: `E-${ct.id.slice(-6)}`, issued_at: new Date().toISOString(), sent_to_worker: true };
   return S.put("payslips", psId(ym), rec);
 }
-async function transfer(ym, kind, file, batch) {
-  const row = $(`#payRows .month-row[data-ym="${ym}"] [data-res]`);
-  if (row) row.innerHTML = '<span class="muted">이체확인증을 읽고 명세서와 대조하는 중…</span>';
+/** 첨부한 이체확인증(E.pending[ym]) 판독 → 발급한 명세서·계약과 대조 → 저장 */
+async function transfer(ym, batch) {
+  const row = $(`#payRows .month-row[data-ym="${ym}"] [data-res]`), pend = E.pending[ym];
+  if (!pend) return;
+  if (row) row.innerHTML = '<span class="muted">AI가 이체확인증을 읽고 명세서와 대조하는 중…</span>';
   try {
     let p = await S.get("payslips", psId(ym));
     if (!p) p = await issue(ym);
-    let truth;
-    if (kind !== "file") {
-      const amount = p.net - (kind === "short" ? 30000 : 0);
-      const url = window.IeumDocs.drawTransfer({ ym, date: p.pay_date, sender: p.company, name: p.worker, amount });
-      file = { media_type: "image/jpeg", data: window.IeumDocs.b64(url) };
-      truth = { transfer: { recipient: p.worker, date: p.pay_date, amount: String(amount), sender: p.company } };
-    }
     const prev = (await S.list("payslips")).filter((x) => x.contract_id === p.contract_id && x.ym < ym).map((x) => ({ ym: x.ym, gross: x.gross }));
-    const res = await api("/api/certificate", { method: "POST", timeoutMs: 45000, body: { kind: "claimdoc", consent: true, month: ym, files: [file],
+    const res = await api("/api/certificate", { method: "POST", timeoutMs: 45000, body: { kind: "claimdoc", consent: true, month: ym, files: [pend.file],
       issued_payslip: { name: p.worker, ym, pay_date: p.pay_date, gross: String(p.gross), deduction: String(p.dedTotal), net: String(p.net) },
-      sample_truth: truth, ctx: { worker: p.worker, hire_date: E.ct.fields.start_date, weekly_hours: C.hours(E.ct.fields).weekly || 40, history: prev } } });
-    p.transfer = { kind: kind === "file" ? "첨부" : "합성(시연)", read: res.transfer, read_source: res.source, model: res.model || "" };
+      sample_truth: pend.truth, ctx: { worker: p.worker, company: p.company, hire_date: E.ct.fields.start_date, weekly_hours: C.hours(E.ct.fields).weekly || 40, history: prev } } });
+    p.transfer = { kind: pend.kind === "file" ? "첨부 파일" : pend.label, read: res.transfer, read_source: res.source, model: res.model || "" };
     p.check = { level: res.check.level, items: res.check.items };
     await S.put("payslips", p.id, p);
+    delete E.pending[ym];
     if (!batch) { await syncCase(false); drawPayRows(); }
   } catch (err) { if (row) row.innerHTML = `<div class="msg error">${esc(err.message)}</div>`; if (batch) throw err; }
 }
@@ -476,9 +597,9 @@ async function syncCase(rebuild) {
   }
   const checklist = [...core.checklist];
   let status = core.status;
-  if (docs.mismatch || docs.uploaded < docs.expected) {
+  if (docs.mismatch || docs.check || docs.uploaded < docs.expected) {
     checklist.push({ level: "확인 필요", item: "월별 서류 사전 점검", basis: "이음24 발급 명세서 · 기업 첨부 이체확인증 (월별 점검 기록)",
-      detail: `대조 ${docs.uploaded}/${docs.expected}개월 · 불일치 ${docs.mismatch}건 — 아래 월별 기록 확인` });
+      detail: `대조 ${docs.uploaded}/${docs.expected}개월 · 불일치 ${docs.mismatch}건 · 확인 필요 ${docs.check}건 — 아래 월별 기록 확인` });
     if (status === "검토 대기") status = "확인 필요";
   }
   await S.put("cases", cs.id, { ...cs, ...core, base_checklist: core.checklist, status_base: core.status, checklist, status, docs,
@@ -497,9 +618,8 @@ async function viewContract(id) {
 async function viewPays(contractId) {
   const pays = (await S.list("payslips")).filter((p) => p.contract_id === contractId).sort((a, b) => a.ym.localeCompare(b.ym));
   if (!pays.length) return toast("아직 발급된 급여명세서가 없어요.");
-  C.view(`급여명세서·이체 확인 ${pays.length}건`, pays.map((p) => `<div class="ps-wrap">${C.payslipHtml(p)}
-    <div class="lc-note"><b>이체 대조</b> ${p.check ? `${badge(p.check.level)} 이체 ${esc((p.transfer.read || {}).recipient || "-")} ${won(num((p.transfer.read || {}).amount))} (${esc((p.transfer.read || {}).date || "-")}) · ${esc(p.transfer.kind)}
-      ${p.check.items.filter((i) => i.level !== "일치").map((i) => `<div class="muted">${esc(i.item)}: ${esc(i.detail)}</div>`).join("")}` : "이체확인증 대기"}</div></div>`).join(""));
+  C.view(`급여명세서·이체확인증 대조 ${pays.length}건`, pays.map((p) => `<div class="ps-wrap">${C.payslipHtml(p)}
+    <div class="lc-note"><b>이체확인증 대조</b> ${p.check ? `${badge(p.check.level)} ${compareHtml(p)}` : "이체확인증 대기"}</div></div>`).join(""));
 }
 
 /* 시연 데이터 초기화 (두 번 눌러야 실행) */

@@ -101,3 +101,32 @@ def test_employer_posted_jobs_reach_seeker_recommendations():
 
 def test_min_wage_2027_registered():
     assert labor.MIN_WAGE[2027] == 10700
+
+
+def test_transfer_sender_and_recipient_checked():
+    from claimdocs import check_month
+    ps = {"name": "정다온", "ym": "2026-11", "gross": "2800000", "net": "2500000"}
+    ctx = {"worker": "정다온", "company": "바른정밀(가상)", "weekly_hours": 40}
+    lv = lambda tr: {i["item"]: i["level"] for i in check_month("2026-11", ps, tr, ctx)["items"]}  # noqa: E731
+    ok = lv({"recipient": "정다온", "amount": "2,500,000원", "date": "2026-12-10", "sender": "주식회사 바른정밀"})
+    assert ok["이체자(보내는 분)"] == "일치" and ok["성명"] == "일치" and ok["실지급액·이체액"] == "일치"
+    assert lv({"recipient": "정다온", "amount": "2500000", "date": "2026-12-10", "sender": "김바른"})["이체자(보내는 분)"] == "확인 필요"
+    assert lv({"recipient": "박서연", "amount": "2500000", "date": "2026-12-10", "sender": "바른정밀"})["성명"] == "불일치"
+    no_company = {i["item"] for i in check_month("2026-11", ps, {"recipient": "정다온", "amount": "2500000"}, {"worker": "정다온"})["items"]}
+    assert "이체자(보내는 분)" not in no_company  # 회사명을 모르면 점검하지 않음 (기존 월별 점검 호환)
+
+
+def test_self_registered_company_industry_is_checked():
+    from rules import posting_check
+    p = parse_posting({**POST, "busino": "000-12-34567", "company": "새벽라운지(가상)", "industry": "일반 유흥 주점업"})
+    assert p["lookup"].startswith("등록되지 않은") and p["industry"] == "일반 유흥 주점업"
+    assert {i["item"]: i["level"] for i in posting_check(p)["items"]}["업종"] == "미충족"
+    q = parse_posting({**POST, "industry": "엉뚱한 업종"})  # 공공데이터 조회 결과가 있으면 그 값이 우선
+    assert q["industry"] == "소프트웨어 개발 및 공급업"
+
+
+def test_companies_collection_stored():
+    store.reset()
+    store.put("companies", "C-0001234567", {"busino": "0001234567", "company": "바른정밀(가상)"})
+    assert store.list_items("companies")[0]["company"] == "바른정밀(가상)"
+    store.reset()
