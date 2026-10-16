@@ -126,28 +126,46 @@ else:
     except ET.ParseError as e:
         err(f"work24_postings.xml: XML 형식 오류 — {e}")
 
-# ── 구직자 (연번 4·5) ──
-section("연번 4·5 · 구직자 seekers.json")
-seekers = load_json("seekers.json")
-if seekers is None:
+# ── 구직자 (연번 4·5) ── 기존 예시 seekers.json + 팀원별 seekers_A.json·seekers_B.json …
+section("연번 4·5 · 구직자 seekers.json · seekers_*.json")
+seeker_names = df.seeker_files()
+if not seeker_names:
     print("  파일 없음 (선택)")
 else:
     ref = next((p for p in posts if p.get("emp_type") == "정규직" and str(p.get("region", ""))[:2] in ("서울", "경기", "인천")
                 and p.get("priority")), {"region": "서울", "emp_type": "정규직", "priority": True})
-    for i, s in enumerate(seekers, 1):
-        w = f"seekers.json {i}번"
-        for k in ("id", "alias", "age", "label", "programs", "activities", "insurance", "desire"):
-            if k not in s:
-                err(f"{w}: '{k}' 항목 없음")
-        for pr in s.get("programs") or []:
-            if pr.get("type") not in ("국민취업지원제도", "청년도전지원사업"):
-                err(f"{w}: programs.type 은 '국민취업지원제도' 또는 '청년도전지원사업'")
-        try:
-            j = judge(s, ref, True)
-            print(f"   · {s.get('alias')} ({s.get('age')}세) → 수도권 정규직 공고 기준 배지 {'대상' if j['eligible'] else '비대상'}"
-                  + (f" ({j.get('reason')})" if j.get("reason") else ""))
-        except Exception as e:  # noqa: BLE001
-            err(f"{w}: 배지 판단 중 오류 — {e!r}")
+    id_owner = {}
+    for name in seeker_names:
+        seekers = load_json(name) or []
+        if not isinstance(seekers, list):
+            err(f"{name}: 맨 바깥은 [ ] 목록이어야 함")
+            continue
+        tag = name[len("seekers_"):-len(".json")] if name.startswith("seekers_") else ""
+        print(f"  [{name}] {len(seekers)}명" + ("  ← 아직 비어 있음" if not seekers else ""))
+        for i, s in enumerate(seekers, 1):
+            w = f"{name} {i}번"
+            if not isinstance(s, dict):
+                err(f"{w}: {{ }} 묶음이어야 함")
+                continue
+            for k in ("id", "alias", "age", "label", "programs", "activities", "insurance", "desire"):
+                if k not in s:
+                    err(f"{w}: '{k}' 항목 없음")
+            sid = s.get("id")
+            if sid in id_owner:
+                err(f"{w}: id '{sid}' 가 {id_owner[sid]} 와 겹침 — id를 바꿔 주세요")
+            elif sid:
+                id_owner[sid] = name
+            if tag and sid and not str(sid).startswith(f"P-{tag}"):
+                warn(f"{w}: {name} 의 id는 'P-{tag}01' 처럼 P-{tag} 로 시작하기로 함 → '{sid}'")
+            for pr in s.get("programs") or []:
+                if pr.get("type") not in ("국민취업지원제도", "청년도전지원사업"):
+                    err(f"{w}: programs.type 은 '국민취업지원제도' 또는 '청년도전지원사업'")
+            try:
+                j = judge(s, ref, True)
+                print(f"   · {s.get('alias')} ({s.get('age')}세) → 수도권 정규직 공고 기준 배지 {'대상' if j['eligible'] else '비대상'}"
+                      + (f" ({j.get('reason')})" if j.get("reason") else ""))
+            except Exception as e:  # noqa: BLE001
+                err(f"{w}: 배지 판단 중 오류 — {e!r}")
 
 # ── 근로계약서 (연번 6) ──
 section("연번 6 · 근로계약서 contracts.json")
