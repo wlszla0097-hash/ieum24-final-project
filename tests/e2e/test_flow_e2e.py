@@ -164,6 +164,7 @@ def test_full_flow_existing_company(app):
     jid = seeker_apply(pg, detail=True)
     open_company(pg, company_key_for(pg, jid))
     hire_stored(pg)
+    pg.click("#ct6m")  # 기존 근로자 등록 — 6개월분 급여 지급일이 지난 시점 (D9: 미리 발급 없음)
     draw_sign(pg)
     save_contract(pg)
     assert "체결 완료" in pg.inner_text("#ctResult h3")
@@ -173,7 +174,7 @@ def test_full_flow_existing_company(app):
     assert "6/6개월" in pg.inner_text("#paySum")
     pg.goto(pg.base + "/#officer"); pg.wait_for_selector(".case.fresh")
     card = pg.locator(".case.fresh").first
-    assert "시연 기준일" in card.locator("header small").inner_text()
+    assert "6/6개월" in card.inner_text()
     card.locator(".decide[data-v='검토 완료']").click()
     pg.wait_for_function("document.querySelector('.case.fresh .decision').textContent.includes('저장됨')")
     pg.reload(); pg.wait_for_selector(".case.fresh")
@@ -216,6 +217,9 @@ def test_worker_signs_from_inbox(app):
     assert ct["status"] == "체결 완료" and ct["sign_kind"] == "인장"
     case = stored(pg, "cases")[0]
     assert case["contract_status"] == "체결 완료"  # 담당자 신청 건에도 반영
+    open_company(pg, company_key_for(pg, jid)); pg.click("[data-etab=list]")  # 기업 화면: 서명 후라 발급 가능(D6)
+    pg.wait_for_selector("#postDetail [data-pay-ct]", timeout=20000); pg.click("#postDetail [data-pay-ct]")
+    pg.wait_for_selector("#payAll"); assert not pg.is_disabled("#payAll") and "서명 전" not in pg.inner_text("#payPanel")
 
 
 @pytest.mark.parametrize("kind,item,level", [("ok", "실지급액·이체액", "일치"), ("short", "실지급액·이체액", "불일치"),
@@ -223,9 +227,10 @@ def test_worker_signs_from_inbox(app):
 def test_transfer_example_cases(app, kind, item, level):
     pg = app
     jid = seeker_apply(pg)
-    open_company(pg, company_key_for(pg, jid)); hire_stored(pg); save_contract(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    pg.click("#ct6m"); draw_sign(pg); save_contract(pg)
     pg.click("#goPay"); pg.wait_for_selector("#payRows [data-ex]")
-    ym = pg.get_attribute("#payRows .month-row >> nth=0", "data-ym")
+    ym = pg.get_attribute("#payRows .month-row[data-state=open] >> nth=0", "data-ym")
     pg.select_option(f"#payRows [data-ex='{ym}']", kind)
     pg.click(f"#payRows [data-run='{ym}']")
     pg.wait_for_selector(f"#payRows .month-row[data-ym='{ym}'] table.cmp", timeout=30000)
@@ -344,3 +349,96 @@ def test_fixed_term_payroll_stops_at_contract_end(app):
     pg.click("#goPay"); pg.wait_for_selector("#payRows .month-row")
     assert pg.locator("#payRows .month-row").count() == 3
     assert "서명 전" in pg.inner_text("#payPanel")
+
+
+# ---------- 2026-10-16 결정 반영 (D3·D4·D6·D9) ----------
+def _ym_shift(ym, k):
+    y, m = int(ym[:4]), int(ym[5:7]) + k
+    while m > 12: y, m = y + 1, m - 12
+    while m < 1: y, m = y - 1, m + 12
+    return f"{y:04d}-{m:02d}"
+
+
+def test_unsigned_contract_cannot_issue_payslip(app):
+    """D6: 근로자 서명 전에는 명세서 발급·예시 첨부·일괄 발급 모두 막힘"""
+    pg = app
+    jid = seeker_apply(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    pg.click("#ct6m"); save_contract(pg)
+    pg.click("#goPay"); pg.wait_for_selector("#payRows .month-row")
+    assert "서명 전" in pg.inner_text("#payPanel") and pg.is_disabled("#payAll")
+    assert pg.locator("#payRows [data-issue]").count() >= 1 and pg.locator("#payRows [data-issue]:not([disabled])").count() == 0
+    assert pg.locator("#payRows [data-ex]").count() == 0
+    assert stored(pg, "payslips") == []
+
+
+def test_monthly_issue_only_after_pay_date(app):
+    """D9: 오늘 입사면 아직 지급일이 지난 달이 없어 전부 '발급 예정', 미리 발급 불가"""
+    pg = app
+    jid = seeker_apply(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    draw_sign(pg); save_contract(pg)
+    pg.click("#goPay"); pg.wait_for_selector("#payRows .month-row")
+    assert pg.locator("#payRows .month-row[data-state=open]").count() == 0
+    assert pg.locator("#payRows .month-row[data-state=future]").count() == 6
+    assert "발급 예정" in pg.inner_text("#payRows") and "미리 발급" not in pg.inner_text("#payRows")
+    pg.click("#payAll"); pg.wait_for_function("document.querySelector('#toast').textContent.includes('기존 근로자 등록')")
+    assert stored(pg, "payslips") == []
+
+
+def test_new_company_months_before_signup_not_issued(app):
+    """D9: 직접 등록한 기업은 이음24 등록월 전 달을 발급하지 않음 (기존 명세서로 확인)"""
+    pg = app
+    register_company(pg); pg.wait_for_selector("#empWork:not([hidden]) #postForm")
+    post_job(pg)
+    seeker_apply(pg, job_id=lambda ids: next(i for i in ids if i.startswith("U-")))
+    goto_companies(pg); pg.click("#coGridUser .co-card"); hire_stored(pg)
+    pg.click("#ct6m"); draw_sign(pg); save_contract(pg)
+    pg.click("#goPay"); pg.wait_for_selector("#payRows .month-row")
+    assert pg.locator("#payRows .month-row[data-state=pre]").count() >= 5
+    assert "이음24 등록 전" in pg.inner_text("#payRows")
+
+
+def test_mid_month_hire_first_payslip_is_prorated(app):
+    """D3: 15일 입사면 첫 달은 일할 계산 (역일 기준), 둘째 달은 전액"""
+    pg = app
+    jid = seeker_apply(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    pg.click("#ct6m")
+    start = pg.input_value('[data-f="start_date"]')
+    first = _ym_shift(start[:7], -1)  # 한 달 더 앞당겨 15일 입사 → 6개월 모두 지급일 지남
+    pg.fill('[data-f="start_date"]', f"{first}-15")
+    wage = int(pg.input_value('[data-f="base_wage"]'))
+    draw_sign(pg); save_contract(pg)
+    pg.click("#goPay"); pg.wait_for_selector(f"#payRows [data-issue='{first}']")
+    assert "일할 " in pg.inner_text(f"#payRows .month-row[data-ym='{first}']") and "일할" not in pg.inner_text(f"#payRows .month-row[data-ym='{_ym_shift(first, 1)}'] .mth")
+    pg.click(f"#payRows [data-issue='{first}']"); pg.wait_for_selector(f"#payRows [data-view='{first}']")
+    second = _ym_shift(first, 1)
+    pg.click(f"#payRows [data-issue='{second}']"); pg.wait_for_selector(f"#payRows [data-view='{second}']")
+    ps = {p["ym"]: p for p in stored(pg, "payslips")}
+    pr = ps[first]["prorate"]
+    assert ps[first]["base"] == wage * pr["days"] // pr["dim"] // 10 * 10 < wage and ps[second]["base"] == wage and ps[second]["prorate"] is None
+    pg.click(f"#payRows [data-view='{first}']")
+    assert "일할 계산" in pg.inner_text("dialog.doc-dlg")
+
+
+def test_contract_change_voids_issued_payslips_keeps_history(app):
+    """D4: 계약 시작일을 바꾸면 이미 발급한 명세서는 지우지 않고 '정정(취소)'로 남김"""
+    pg = app
+    jid = seeker_apply(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    pg.click("#ct6m"); draw_sign(pg); save_contract(pg)
+    pg.click("#goPay"); pg.wait_for_selector("#payRows [data-issue]")
+    first = pg.get_attribute("#payRows .month-row[data-state=open] >> nth=0", "data-ym")
+    pg.click(f"#payRows [data-issue='{first}']"); pg.wait_for_selector(f"#payRows [data-view='{first}']")
+    pg.fill('[data-f="start_date"]', f"{_ym_shift(first, 1)}-01")  # 입사를 한 달 늦춤 → 첫 달은 대상 아님
+    draw_sign(pg); pg.click("#ctSave")
+    pg.wait_for_function("document.querySelector('#toast').textContent.includes('정정(취소)')", timeout=20000)
+    ps = stored(pg, "payslips")
+    assert len(ps) == 1 and ps[0]["voided"] and "계약 기간" in ps[0]["voided"]["reason"] and "정정" in ps[0]["id"]
+    pg.click("#goPay"); pg.wait_for_selector("#payRows details.voided")
+    assert "정정(취소)된 명세서 1건" in pg.inner_text("#payRows")
+    pg.goto(pg.base + "/#seeker"); pg.wait_for_selector("#myDocs .md-row")
+    t = pg.inner_text("#myDocs")
+    assert "급여명세서 0건" in t and "정정(취소)된 명세서 1건" in t
+    assert not pg.errors, pg.errors

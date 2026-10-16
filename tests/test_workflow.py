@@ -144,3 +144,19 @@ def test_recommendation_excludes_tax_arrears_but_keeps_excluded_industry():
     j = judge(person, bar, True)
     assert j["badge"] is False and j["type"] == "excluded_industry"  # 지원제도 표시만 막음
     assert judge(person, {**bar, "industry": "소프트웨어 개발 및 공급업"}, True)["badge"] is True
+
+
+def test_prorated_first_month_min_wage_compares_worked_days():
+    """D3: 15일 입사 첫 달(일할 17/31일)은 일할한 최저임금과 비교 — 한 달치 기준으로 '불일치'가 나오면 안 됨."""
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    gross = 2800000 * 17 // 31 // 10 * 10
+    issued = {"name": "정다온", "ym": "2026-07", "pay_date": "2026-08-10", "gross": str(gross), "deduction": "0", "net": str(gross)}
+    tr = {"transfer": {"recipient": "정다온", "date": "2026-08-10", "amount": str(gross), "sender": "회사"}}
+    body = {"month": "2026-07", "files": [f], "issued_payslip": issued, "sample_truth": tr,
+            "ctx": {"worker": "정다온", "hire_date": "2026-07-15", "weekly_hours": 40}}
+    lv = lambda r: {i["item"]: i["level"] for i in r["check"]["items"]}["최저임금"]  # noqa: E731
+    assert lv(certificate.claimdoc(body)) == "불일치"  # 일할 정보 없으면 한 달치와 비교
+    r = certificate.claimdoc({**body, "ctx": {**body["ctx"], "prorate": {"days": 17, "dim": 31}}})
+    assert lv(r) == "일치" and "일할 17/31일" in str(r["check"]["items"])
+    bad = certificate.claimdoc({**body, "ctx": {**body["ctx"], "prorate": {"days": 40, "dim": 31}}})  # 잘못된 값은 무시
+    assert lv(bad) == "불일치"

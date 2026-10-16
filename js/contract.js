@@ -187,9 +187,11 @@ function synthPay(gross, ym) {
   return { ym, gross, ded, dedTotal, net: gross - dedTotal };
 }
 function payslipHtml(p) {
-  const rows = [["기본급", p.base, `월 소정근로 ${p.monthly_hours}시간 기준 월급 (근로계약서 6항)`]];
-  if (p.allow) rows.push([p.allow_name || "고정수당", p.allow, "근로계약서 6항 기타급여"]);
+  const pr = p.prorate, part = (full) => (pr ? ` — 일할 계산: ${won(full)} × ${pr.days}/${pr.dim}일 (월 중간 입사·종료)` : "");
+  const rows = [["기본급", p.base, `월 소정근로 ${p.monthly_hours}시간 기준 월급 (근로계약서 6항)${part(p.base_full)}`]];
+  if (p.allow) rows.push([p.allow_name || "고정수당", p.allow, `근로계약서 6항 기타급여${part(p.allow_full)}`]);
   return `<article class="lc-doc ps-doc">
+    ${p.voided ? `<p class="msg error">정정(취소)된 명세서 — ${esc(p.voided.reason)}</p>` : ""}
     <h3 class="lc-title">임금명세서<small>${esc(p.ym.replace("-", "년 "))}월분</small></h3>
     <table class="ps-head"><tr><th>회사명</th><td>${esc(p.company)}</td><th>지급일</th><td>${esc(p.pay_date)}</td></tr>
       <tr><th>성명</th><td>${esc(p.worker)}</td><th>사원번호</th><td>${esc(p.emp_no)}</td></tr></table>
