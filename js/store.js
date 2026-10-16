@@ -2,13 +2,13 @@
  *
  * 서버 저장소(Upstash Redis, /api/store)가 연결돼 있으면 서버에, 아니면 이 브라우저(localStorage)에 JSON으로 저장한다.
  * 묶음: seekers(구직자 이력·포트폴리오), companies(직접 등록한 기업), applications(지원), postings(기업이 게시한 공고), contracts(근로계약서),
- *       payslips(급여명세서·이체 확인), cases(담당자 확인 대시보드 신청 건)
+ *       payslips(급여명세서·이체 확인), cases(담당자 확인 대시보드 신청 건), ailog(AI 호출 기록 — 모델·응답 시간·차단 수·결과)
  * 합성(가상) 데이터만 넣는 시연용이다.
  */
 (function () {
 "use strict";
 const LS = "ieum24:demo:";
-const COLS = ["seekers", "companies", "applications", "postings", "contracts", "payslips", "cases"];
+const COLS = ["seekers", "companies", "applications", "postings", "contracts", "payslips", "cases", "ailog"];  // ailog: AI 테스트 기록(모델 비교)
 let mode = null;          // "server" | "local"
 let serverKind = "";      // upstash | memory
 const mem = {};           // localStorage를 못 쓰는 환경(사생활 보호 모드 등)용

@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 sys.path.insert(0, str(ROOT / "api"))
-for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "WORK24_KEY"):
+for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "WORK24_KEY"):
     os.environ.pop(k, None)
 
 import pytest  # noqa: E402

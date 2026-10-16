@@ -31,7 +31,7 @@ def _free_port():
 
 def _server(extra_env=None):
     port = _free_port()
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("ANTHROPIC", "GEMINI", "KV_", "UPSTASH"))}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("ANTHROPIC", "OPENAI", "GEMINI", "KV_", "UPSTASH"))}
     env.update({"PORT": str(port), "VERCEL": "", **(extra_env or {})})
     if not env["VERCEL"]:
         env.pop("VERCEL")
@@ -438,7 +438,33 @@ def test_contract_change_voids_issued_payslips_keeps_history(app):
     assert len(ps) == 1 and ps[0]["voided"] and "계약 기간" in ps[0]["voided"]["reason"] and "정정" in ps[0]["id"]
     pg.click("#goPay"); pg.wait_for_selector("#payRows details.voided")
     assert "정정(취소)된 명세서 1건" in pg.inner_text("#payRows")
-    pg.goto(pg.base + "/#seeker"); pg.wait_for_selector("#myDocs .md-row")
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelector('#myDocs').textContent.includes('근로계약서 1건')")  # 화면 갱신 뒤에 확인
     t = pg.inner_text("#myDocs")
     assert "급여명세서 0건" in t and "정정(취소)된 명세서 1건" in t
+    assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 팀원 테스트 결과 전달 ----------
+def test_seeker_export_includes_ai_test_log(app, tmp_path):
+    """구직자 화면 [테스트 결과 내보내기]: AI 호출 기록(ailog)·구직자·지원이 한 파일로, 키 값은 없음"""
+    pg = app
+    seeker_apply(pg, example="P-01")
+    log = stored(pg, "ailog")
+    assert len(log) == 1 and log[0]["kind"] == "이력 정리·공고 추천" and log[0]["example_id"] == "P-01"
+    assert log[0]["ms"] >= 0 and log[0]["result"]["jobs"] and log[0]["ai_used"] is False  # 테스트 서버는 키 없음
+    pg.wait_for_function("document.querySelector('#myDocs').textContent.includes('지원 현황 1건')")  # 새로고침 없이 반영
+    assert "서버를 끄면 테스트 결과가 사라져요" in pg.inner_text("#myDocs")
+    with pg.expect_download() as dl:
+        pg.click("#myDocs #mdExport")
+    path = tmp_path / "out.json"; dl.value.save_as(path)
+    assert dl.value.suggested_filename.startswith("ieum24-test-no-ai-")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert len(data["seekers"]) == 1 and len(data["applications"]) == 1 and len(data["ailog"]) == 1
+    assert data["ai"]["provider"] == "not_configured" and "API_KEY" not in path.read_text(encoding="utf-8")
+    goto_companies(pg)  # 기업 화면 내보내기도 같은 내용
+    pg.wait_for_function("document.querySelector('#storeStats').textContent.includes('AI 테스트 기록 1건')")
+    with pg.expect_download() as dl2:
+        pg.click("#storeExport")
+    assert dl2.value.suggested_filename.startswith("ieum24-test-")
     assert not pg.errors, pg.errors

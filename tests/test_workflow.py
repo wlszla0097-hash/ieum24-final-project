@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 os.environ["IEUM_BUILTIN_ONLY"] = "1"
-for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "VERCEL"):
+for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "VERCEL"):
     os.environ.pop(k, None)
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "api"))

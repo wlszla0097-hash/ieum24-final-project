@@ -57,7 +57,9 @@ async function seekerInbox() {
     const empty = !$("#seekForm [name=experience]").value.trim();
     const switcher = `<div class="btn-row"><span class="muted">저장된 구직자 ${all.length}명</span>
       ${all.length ? `<select id="mdSwitch" aria-label="저장된 구직자로 바꾸기"><option value="">저장된 구직자로 바꾸기…</option>${all.map((x) => `<option value="${esc(x.id)}" ${x.id === me ? "selected" : ""}>${esc(x.alias || "구직자")} · ${esc(String(x.updated || "").slice(0, 10))}</option>`).join("")}</select>` : ""}
-      <button class="btn ghost sm" type="button" id="mdNew">+ 새 구직자로 작성 (시연)</button></div>`;
+      <button class="btn ghost sm" type="button" id="mdNew">+ 새 구직자로 작성 (시연)</button>
+      <button class="btn ghost sm" type="button" id="mdExport">📤 테스트 결과 내보내기(JSON)</button></div>
+      ${S.mode() === "server" && /메모리/.test(S.label()) ? '<p class="msg info">개발 서버 메모리에 저장 중이라 <b>서버를 끄면 테스트 결과가 사라져요.</b> 끄기 전에 [📤 테스트 결과 내보내기]를 눌러 주세요.</p>' : ""}`;
     if (!sk && !myApps.length) {
       box.innerHTML = `<h2 class="panel-title">📥 내 서류함 <small class="muted">${esc(S.label())}</small></h2>${switcher}<p class="muted">지금은 새 구직자입니다. 아래에 이력을 입력해 저장하세요.</p>`;
       bindSwitch(box); return;
@@ -91,6 +93,8 @@ async function seekerInbox() {
 }
 /** 저장된 구직자 바꾸기 / 새 구직자로 시작: 여러 구직자 데이터가 쌓이는 것을 한 브라우저에서 시연 */
 function bindSwitch(box) {
+  const ex = $("#mdExport", box);
+  if (ex) ex.onclick = () => { ex.disabled = true; exportData().catch((err) => toast(esc(err.message))).finally(() => (ex.disabled = false)); };
   const clear = () => {
     $("#seekForm").reset(); syncProgramBoxes();
     Object.assign(state, { profile: null, points: [], portfolio: "", headline: "", jobs: [], cert: null });
@@ -146,7 +150,7 @@ async function stats() {
   const el = $("#storeStats"); if (!el) return;
   try {
     const d = await S.dump();
-    el.innerHTML = `저장 현황 — 구직자 <b>${d.seekers.length}</b>명 · 직접 등록 기업 <b>${d.companies.length}</b>곳 · 게시 공고 <b>${d.postings.length}</b>건 · 지원 <b>${d.applications.length}</b>건 · 근로계약서 <b>${d.contracts.length}</b>건 · 급여명세서 <b>${d.payslips.length}</b>건 · 신청 건 <b>${d.cases.length}</b>건`;
+    el.innerHTML = `저장 현황 — 구직자 <b>${d.seekers.length}</b>명 · 직접 등록 기업 <b>${d.companies.length}</b>곳 · 게시 공고 <b>${d.postings.length}</b>건 · 지원 <b>${d.applications.length}</b>건 · 근로계약서 <b>${d.contracts.length}</b>건 · 급여명세서 <b>${d.payslips.length}</b>건 · 신청 건 <b>${d.cases.length}</b>건 · AI 테스트 기록 <b>${d.ailog.length}</b>건`;
   } catch (err) { el.textContent = err.message; }
 }
 async function selectCompany(key) {
@@ -182,15 +186,19 @@ $("#coNew").addEventListener("submit", async (e) => {
   } catch (err) { showMsg(msg, err.message); }
   finally { btn.disabled = false; btn.textContent = "등록하고 시작하기"; }
 });
-/* 저장 데이터 내보내기: 쌓인 시연 데이터를 JSON 파일로 받아 저장소(data/)에 올릴 수 있게 */
-$("#storeExport").onclick = async () => {
-  try {
-    const d = await S.dump();
-    const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), note: "이음24 시연 데이터(합성)", ...d }, null, 1)], { type: "application/json" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ieum24-demo-data-${today()}.json`; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  } catch (err) { toast(esc(err.message)); }
-};
+/* 저장 데이터 내보내기: 쌓인 시연 데이터 + AI 테스트 기록을 JSON 파일로 받아 저장소(results/)에 올릴 수 있게.
+   개발 서버 메모리 저장은 서버를 끄면 사라지므로, 테스트를 마치면 끄기 전에 내보낸다. 키 값은 들어가지 않는다. */
+async function exportData() {
+  const d = await S.dump();
+  let ai = null;
+  try { const h = await api("/api/health", { timeoutMs: 8000 }); ai = { provider: h.ai, model: h.model, endpoint: h.ai_endpoint }; } catch (e) { /* 연동 상태를 못 읽어도 내보내기는 진행 */ }
+  const tag = ai && ai.model ? String(ai.model).replace(/[^\w.-]+/g, "_").slice(0, 40) : "no-ai";
+  const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), note: "이음24 시연 데이터(합성)", ai, store: S.mode(), ...d }, null, 1)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ieum24-test-${tag}-${today()}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast(`내보냈어요 — 구직자 ${d.seekers.length}명 · 지원 ${d.applications.length}건 · AI 테스트 기록 ${d.ailog.length}건. 다운로드 폴더의 파일을 results/ 폴더로 옮겨 올려 주세요.`);
+}
+$("#storeExport").onclick = () => exportData().catch((err) => toast(esc(err.message)));
 
 function showWork(fresh) {
   $("#empCompanies").hidden = true; $("#empWork").hidden = false;
