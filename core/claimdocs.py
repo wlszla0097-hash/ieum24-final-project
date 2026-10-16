@@ -107,8 +107,11 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
         add(CHECK, "최저임금", f"{year}년 최저임금 미등록 — 고시 금액 확인", "최저임금법 제6조")
     else:
         need = rate * monthly_hours(weekly)
+        pr, part = ctx.get("prorate"), ""
+        if pr:  # 월 중간 입사·종료 달은 근무한 날만큼 일할한 금액과 비교
+            need, part = need * pr["days"] // pr["dim"], f", 일할 {pr['days']}/{pr['dim']}일"
         add(MATCH if gross >= need else MISMATCH, "최저임금",
-            f"지급총액 {gross:,}원 {'≥' if gross >= need else '<'} 월 환산 {need:,}원 (주 {weekly:g}시간, {year}년 {rate:,}원) — 산입범위는 원본으로 확인",
+            f"지급총액 {gross:,}원 {'≥' if gross >= need else '<'} 월 환산 {need:,}원 (주 {weekly:g}시간, {year}년 {rate:,}원{part}) — 산입범위는 원본으로 확인",
             "최저임금법 제6조")
 
     hist = [h for h in (ctx.get("history") or []) if _won(h.get("gross")) is not None and h.get("ym") != month]

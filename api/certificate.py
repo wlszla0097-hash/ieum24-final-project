@@ -22,6 +22,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from ai import generate_json, model_name, provider  # noqa: E402
 from common import ApiError, JsonHandler, rate_limited, text  # noqa: E402
 from claimdocs import check_month  # noqa: E402
+
+
+def _prorate(v):
+    """첫·마지막 달 일할 정보 {days, dim} — 형식이 맞을 때만 쓴다."""
+    try:
+        days, dim = int(v["days"]), int(v["dim"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    return {"days": days, "dim": dim} if 28 <= dim <= 31 and 0 < days < dim else None
 from rules import d  # noqa: E402
 
 TYPES = {"image/png", "image/jpeg", "image/webp", "application/pdf"}
@@ -127,7 +136,8 @@ def claimdoc(body: dict) -> dict:
     tr = {k: text((ai.get("transfer") or {}).get(k), 40) for k in TRANSFER_KEYS}
     ctx = body.get("ctx") if isinstance(body.get("ctx"), dict) else {}
     ctx = {"worker": text(ctx.get("worker"), 20), "company": text(ctx.get("company"), 40), "hire_date": text(ctx.get("hire_date"), 10), "weekly_hours": ctx.get("weekly_hours") or 40,
-           "history": [{"ym": text(h.get("ym"), 7), "gross": h.get("gross")} for h in (ctx.get("history") or [])[:24] if isinstance(h, dict)]}
+           "history": [{"ym": text(h.get("ym"), 7), "gross": h.get("gross")} for h in (ctx.get("history") or [])[:24] if isinstance(h, dict)],
+           "prorate": _prorate(ctx.get("prorate"))}
     return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "source": source, "model": model, "payslip_source": "issued" if issued else source,
             "check": check_month(month, ps, tr, ctx),
             "note": "판독값은 원본과 대조해 확인하세요. 지급 가능 여부는 판정하지 않습니다. 파일은 저장하지 않습니다."}
