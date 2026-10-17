@@ -612,3 +612,16 @@ def test_seeker_cert_sample_fills_program_date(app):
     pg.select_option("#certSample", "training"); pg.click("#certBtn")
     pg.wait_for_function("document.querySelector('#certResult').textContent.includes('확인되지 않았어요')", timeout=20000)
     assert not pg.errors, pg.errors
+
+
+def test_cert_sample_uses_loaded_seeker_date(app):
+    """시연 함정(10/17 발견): 윤하람(국취 2025-11-03)을 불러온 뒤 예시 참여확인서를 읽히면 다른 사람 날짜(2026-04-20)로 덮어써졌음"""
+    pg = app
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.select_option("#seekExample", "P-S04"); pg.fill("#s_alias", "윤하람")
+    pg.check("#seekForm [name=agree_cert]")
+    pg.select_option("#certSample", "kuchwi")
+    pg.click("#certBtn"); pg.wait_for_selector("#certResult .cert-read", timeout=20000)
+    assert pg.input_value("#kuchwi_qualified") == "2025-11-03"
+    assert not pg.errors, pg.errors

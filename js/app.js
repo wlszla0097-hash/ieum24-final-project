@@ -119,8 +119,24 @@ $$("#seekForm [data-consent]").forEach((el) => el.addEventListener("change", () 
 /* 증빙 서류 판독: AI는 읽기만 하고, 값은 본인이 확인한 뒤 폼에 남는다 */
 const toBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
 /* 시연용 예시 증빙 서류: 가상 양식 이미지를 만들어 '첨부한 것처럼' 쓴다 (내 파일을 고르면 그쪽이 우선) */
+/* 예시 서류는 지금 입력된 사람의 이름·날짜로 만든다 — 다른 사람 예시 날짜가 입력 칸을 덮어써 시연 판정이 바뀌는 일 방지 */
+function personalCert(c) {
+  if (!c) return c;
+  const ymd = (s) => { const [y, m, d] = s.split("-").map(Number); return `${y}. ${m}. ${d}.`; };
+  const plus = (s, n) => { const t = new Date(`${s}T00:00:00`); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
+  const alias = (seekEl("alias") && seekEl("alias").value.trim()) || "";
+  const name = alias ? `${alias}(가상)` : c.name;
+  const q = seekEl("kuchwi_qualified") && seekEl("kuchwi_qualified").value, done = seekEl("dojeon_completed") && seekEl("dojeon_completed").value;
+  if (c.kind === "kuchwi" && /^\d{4}-\d{2}-\d{2}$/.test(q || "")) {
+    return { ...c, name, rows: c.rows.map(([k, v]) => [k, k === "수급자격 인정일" ? ymd(q) : k === "취업활동계획 수립일" ? ymd(plus(q, 14)) : v]), truth: { ...c.truth, date: q } };
+  }
+  if (c.kind === "dojeon" && /^\d{4}-\d{2}-\d{2}$/.test(done || "")) {
+    return { ...c, name, date: done, rows: c.rows.map(([k, v]) => [k, k === "수료일" ? ymd(done) : k === "참여기간" ? `${ymd(plus(done, -88))} ~ ${ymd(done)}` : v]), truth: { ...c.truth, date: done } };
+  }
+  return { ...c, name };
+}
 $("#certSample").addEventListener("change", (e) => {
-  const c = window.IeumContract.CERT_SAMPLES[e.target.value];
+  const c = personalCert(window.IeumContract.CERT_SAMPLES[e.target.value]);
   state.certSample = c ? { media_type: "image/png", data: window.IeumContract.drawCertificate(c).split(",")[1], label: e.target.selectedOptions[0].text,
     truth: { doc_type: c.kind === "kuchwi" ? "참여확인서" : "수료증", program_text: c.rows.find(([k]) => k === "사업명")?.[1] || "", course: c.rows.find(([k]) => k === "과정명")?.[1] || "",
       issuer: c.issuer.replace(/ (센터장|소장|원장)$/, ""), date: c.truth.date, date_label: c.kind === "kuchwi" ? "수급자격 인정일" : "수료일", readable: true } } : null;

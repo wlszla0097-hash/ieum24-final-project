@@ -80,7 +80,7 @@ def test_case_for_stored_applicant_with_demo_as_of():
 
 
 def test_claimdoc_checks_issued_payslip_against_transfer_only():
-    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"\x89PNG" + b"x" * 10).decode()}
     issued = {"name": "정다온", "ym": "2026-11", "pay_date": "2026-12-10", "gross": "2800000", "deduction": "300000", "net": "2500000"}
     body = {"month": "2026-11", "files": [f], "issued_payslip": issued, "ctx": {"worker": "정다온", "hire_date": "2026-10-15", "weekly_hours": 40}}
     ok = certificate.claimdoc({**body, "sample_truth": {"transfer": {"recipient": "정다온", "date": "2026-12-10", "amount": "2500000", "sender": "회사"}}})
@@ -149,7 +149,7 @@ def test_recommendation_excludes_tax_arrears_but_keeps_excluded_industry():
 
 def test_prorated_first_month_min_wage_compares_worked_days():
     """D3: 15일 입사 첫 달(일할 17/31일)은 일할한 최저임금과 비교 — 한 달치 기준으로 '불일치'가 나오면 안 됨."""
-    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"\x89PNG" + b"x" * 10).decode()}
     gross = 2800000 * 17 // 31 // 10 * 10
     issued = {"name": "정다온", "ym": "2026-07", "pay_date": "2026-08-10", "gross": str(gross), "deduction": "0", "net": str(gross)}
     tr = {"transfer": {"recipient": "정다온", "date": "2026-08-10", "amount": str(gross), "sender": "회사"}}
@@ -191,7 +191,7 @@ def test_transfer_rows_fix_ai_field_mixups(monkeypatch):
     swapped = {"transfer": {"recipient": "김대표", "sender": "서지우", "amount": "2030970", "date": "2026-05-10"}, "rows": rows}
     monkeypatch.setattr(certificate, "provider", lambda: "claude")
     monkeypatch.setattr(certificate, "generate_json", lambda *a, **k: json.loads(json.dumps(swapped)))
-    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"\x89PNG" + b"x" * 10).decode()}
     r = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": {"worker": "서지우", "company": "다온물류(가상)"},
                               "issued_payslip": {"name": "서지우", "ym": "2026-04", "pay_date": "2026-05-10", "gross": "2300000", "deduction": "269030", "net": "2030970"}})
     assert r["transfer"]["sender"] == "김대표" and r["transfer"]["recipient"] == "서지우"
@@ -285,7 +285,7 @@ def test_swapped_reading_is_corrected_and_corp_jamo_slip():
     # 외부 검토 반영: 자음까지 다른 회사명(다운몬류)은 같은 회사로 단정하지 않음 / 모음만 다르면(다운몰류) 판독 오차로 일치
     assert check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몬류 (가상)", "amount": "2030970", "date": "2026-05-10"}, ctx)["level"] == "확인 필요"
     assert check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몰류 (가상)", "amount": "2030970", "date": "2026-05-10"}, ctx)["level"] == "일치"
-    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"\x89PNG" + b"x" * 10).decode()}
     out = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": ctx, "issued_payslip": {**ps, "pay_date": "2026-05-10", "deduction": "0"},
                                 "sample_truth": {"transfer": {"recipient": "김대표", "sender": "윤하람", "amount": "2030970", "date": "2026-05-10"}}})
     assert out["transfer"]["sender"] == "김대표" and out["transfer"]["recipient"] == "윤하람"  # 화면 비교표도 바로잡힌 값
@@ -330,3 +330,29 @@ def test_case_uses_real_contract_and_hides_details_without_consent():
                           contract={"employment_type": "기간제", "end_date": "2026-06-30"}, today=_d(2026, 10, 20))
     lv = {i["item"]: i["level"] for i in c2["checklist"]}
     assert lv["고용형태"] == "확인 필요" and "6개월 경과" in lv and any(m["item"] == "실제 고용유지" for m in c2["manual"])
+
+
+def test_uploaded_file_errors_are_explained_not_retry():
+    """배포 실측(10/17): 암호 PDF를 올리면 AI 서비스가 400으로 거절 → '잠시 후 다시' 대신 원인을 안내"""
+    import base64
+    import certificate
+    b = lambda raw: base64.b64encode(raw).decode()  # noqa: E731
+    enc = b(b"%PDF-1.7\n1 0 obj\n<< /Encrypt 5 0 R >>\nendobj\n%%EOF")
+    with pytest.raises(ApiError) as e:
+        certificate.read({"consent": True, "media_type": "application/pdf", "data": enc})
+    assert e.value.status == 422 and "비밀번호" in str(e.value)
+    with pytest.raises(ApiError) as e:  # 확장자만 PDF로 바꾼 이미지
+        certificate.read({"consent": True, "media_type": "application/pdf", "data": b(b"\x89PNG....")})
+    assert e.value.status == 422
+    assert certificate.check_file("image/jpeg", b(b"\x89PNG" + b"x" * 5)) == "image/png"  # PNG를 JPG로 표시해도 실제 형식으로
+    monkey_err = ApiError(502, "ai_bad_request", "AI 서비스 오류(400)")
+
+    def boom(*a, **k):
+        raise monkey_err
+    certificate.generate_json, orig = boom, certificate.generate_json
+    try:
+        with pytest.raises(ApiError) as e:
+            certificate.ai_read("s", "u", 10, {"media_type": "application/pdf", "data": "x"})
+        assert e.value.status == 422 and "읽을 수 없는" in str(e.value)
+    finally:
+        certificate.generate_json = orig
