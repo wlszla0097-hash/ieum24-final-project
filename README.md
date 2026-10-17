@@ -19,7 +19,7 @@
 
 - `main`에 직접 올리지 않습니다. 각자 브랜치(`seeker-data-이름`) → Pull Request, 합치기는 팀장이 합니다.
 - 구직자 합성데이터는 **사람별 파일**에만 넣습니다: 지수 `data/synthetic/seekers_A.json`(P-A01~), 홍주 `seekers_B.json`(P-B01~). `seekers.json`은 수정하지 않습니다.
-- 테스트 결과는 구직자 화면 [📥 내 서류함] → **[📤 테스트 결과 내보내기(JSON)]** 파일을 `results/`에 넣어 같은 PR로 올립니다 (개발 서버를 끄면 결과가 사라지므로 끄기 전에). 방법: [results/README.md](results/README.md)
+- 테스트 결과는 구직자 화면 [📥 내 서류함] → **[📤 테스트 결과 내보내기(JSON)]** 파일을 `results/`에 넣어 같은 PR로 올립니다 (개발 서버를 끄면 결과가 사라지므로 끄기 전에). 팀장은 [결과 불러오기(JSON)]로 여러 파일을 한 브라우저에 합칩니다. 방법: [results/README.md](results/README.md)
 - PR 전 확인: `python3 tools/check_synthetic.py`(✖ 없음) · `python3 -m pytest -q tests`(모두 통과)
 - API 키는 `.env`(내 컴퓨터)와 Vercel 환경 변수에만 둡니다.
 

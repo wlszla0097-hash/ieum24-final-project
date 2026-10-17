@@ -85,6 +85,25 @@ function newMe(given) {
   try { localStorage.setItem(LS + "me", id); } catch (e) { /* 메모리만 */ }
   return id;
 }
+/** 내보내기 파일(JSON) 불러오기 — 같은 id는 덮어쓰고 나머지는 합친다. 출처(파일 이름)를 항목마다 남긴다.
+ *  알 수 없는 묶음·형식이 틀린 항목은 건너뛴다. 반환: { 묶음: 불러온 건수 } */
+async function importAll(data, source) {
+  await init();
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("이음24에서 내보낸 JSON 파일이 아니에요.");
+  const counts = {};
+  for (const col of COLS) {
+    const rows = Array.isArray(data[col]) ? data[col].slice(0, 300) : [];
+    const ok = rows.filter((x) => x && typeof x === "object" && !Array.isArray(x) && typeof x.id === "string" && x.id && x.id.length <= 120);
+    if (!ok.length) continue;
+    const tag = (x) => ({ ...x, imported_from: x.imported_from || String(source || "").slice(0, 80), imported_at: new Date().toISOString() });
+    if (mode === "server") { for (const x of ok) await call({ op: "put", col, id: x.id, value: tag(x) }); }
+    else { const all = lsGet(col); ok.forEach((x) => (all[x.id] = tag(x))); lsSet(col, all); }
+    counts[col] = ok.length;
+  }
+  if (!Object.keys(counts).length) throw new Error("불러올 시연 데이터가 없는 파일이에요.");
+  return counts;
+}
+
 /** 저장된 시연 데이터 전체 (JSON 내보내기·저장 현황용) */
 async function dump() {
   const out = {};
@@ -96,5 +115,5 @@ function label() {
   return "이 브라우저에만 저장 — 같은 브라우저에서 구직자·기업·담당자 화면을 오가며 시연하세요";
 }
 
-window.IeumStore = { init, list, get, put, del, reset, me, newMe, dump, label, COLS, mode: () => mode };
+window.IeumStore = { init, list, get, put, del, reset, me, newMe, dump, importAll, label, COLS, mode: () => mode };
 })();

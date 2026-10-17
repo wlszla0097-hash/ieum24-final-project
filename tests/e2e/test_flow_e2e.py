@@ -468,3 +468,49 @@ def test_seeker_export_includes_ai_test_log(app, tmp_path):
         pg.click("#storeExport")
     assert dl2.value.suggested_filename.startswith("ieum24-test-")
     assert not pg.errors, pg.errors
+
+
+def test_team_results_merge_on_leader_browser(browser, tmp_path):
+    """팀원 2명이 각자 컴퓨터(서버)에서 테스트 → 내보내기 → 팀장 브라우저에서 두 파일 불러오기 → 기업 화면에서 이어서 채용"""
+    files, jids = [], []
+    for who, ex in (("A", "P-01"), ("B", "P-S01")):
+        proc, base = _server()  # 팀원마다 다른 개발 서버(메모리 저장) = 다른 컴퓨터
+        try:
+            pg = _page(browser, base)
+            jids.append(seeker_apply(pg, example=ex, alias=f"팀원{who}구직"))
+            pg.wait_for_selector("#myDocs #mdExport")
+            with pg.expect_download() as dl:
+                pg.click("#myDocs #mdExport")
+            path = tmp_path / f"export_{who}.json"; dl.value.save_as(path); files.append(str(path))
+            pg.context.close()
+        finally:
+            proc.kill()
+    proc, base = _server({"VERCEL": "1"})  # 팀장: 배포 환경과 같은 브라우저 저장
+    try:
+        pg = _page(browser, base)
+        goto_companies(pg)
+        bad = tmp_path / "broken.json"; bad.write_text("{ 깨진", encoding="utf-8")
+        with pg.expect_file_chooser() as fc:
+            pg.click("#storeImport")
+        fc.value.set_files(files + [str(bad)])
+        pg.wait_for_function("document.querySelector('#toast').textContent.includes('export_B.json')")
+        toast = pg.inner_text("#toast")
+        assert "export_A.json: 구직자 1 · 지원 1 · AI 기록 1" in toast and "broken.json: 불러오지 못함" in toast
+        pg.wait_for_function("document.querySelector('#storeStats').textContent.includes('지원 2건')")
+        assert "AI 테스트 기록 2건" in pg.inner_text("#storeStats")
+        seekers = stored(pg, "seekers")
+        assert sorted(s["alias"] for s in seekers) == ["팀원A구직", "팀원B구직"]
+        assert {s["imported_from"] for s in seekers} == {"export_A.json", "export_B.json"}  # 누구 결과인지 구분
+        # 같은 파일을 다시 불러와도 늘어나지 않음(덮어쓰기)
+        with pg.expect_file_chooser() as fc:
+            pg.click("#storeImport")
+        fc.value.set_files(files[:1])
+        pg.wait_for_timeout(500)
+        assert len(stored(pg, "seekers")) == 2 and len(stored(pg, "applications")) == 2
+        # 팀원 A가 지원한 회사에서 팀원 구직자가 지원자로 보이고, 채용 확정까지 이어짐
+        open_company(pg, company_key_for(pg, jids[0])); hire_stored(pg)
+        assert "팀원A구직" in pg.inner_text("#ctDoc")
+        assert not pg.errors, pg.errors
+        pg.context.close()
+    finally:
+        proc.kill()

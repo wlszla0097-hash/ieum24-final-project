@@ -58,7 +58,8 @@ async function seekerInbox() {
     const switcher = `<div class="btn-row"><span class="muted">저장된 구직자 ${all.length}명</span>
       ${all.length ? `<select id="mdSwitch" aria-label="저장된 구직자로 바꾸기"><option value="">저장된 구직자로 바꾸기…</option>${all.map((x) => `<option value="${esc(x.id)}" ${x.id === me ? "selected" : ""}>${esc(x.alias || "구직자")} · ${esc(String(x.updated || "").slice(0, 10))}</option>`).join("")}</select>` : ""}
       <button class="btn ghost sm" type="button" id="mdNew">+ 새 구직자로 작성 (시연)</button>
-      <button class="btn ghost sm" type="button" id="mdExport">📤 테스트 결과 내보내기(JSON)</button></div>
+      <button class="btn ghost sm" type="button" id="mdExport">📤 테스트 결과 내보내기(JSON)</button>
+      <button class="btn ghost sm" type="button" id="mdImport">📥 결과 불러오기(JSON)</button></div>
       ${S.mode() === "server" && /메모리/.test(S.label()) ? '<p class="msg info">개발 서버 메모리에 저장 중이라 <b>서버를 끄면 테스트 결과가 사라져요.</b> 끄기 전에 [📤 테스트 결과 내보내기]를 눌러 주세요.</p>' : ""}`;
     if (!sk && !myApps.length) {
       box.innerHTML = `<h2 class="panel-title">📥 내 서류함 <small class="muted">${esc(S.label())}</small></h2>${switcher}<p class="muted">지금은 새 구직자입니다. 아래에 이력을 입력해 저장하세요.</p>`;
@@ -93,6 +94,8 @@ async function seekerInbox() {
 }
 /** 저장된 구직자 바꾸기 / 새 구직자로 시작: 여러 구직자 데이터가 쌓이는 것을 한 브라우저에서 시연 */
 function bindSwitch(box) {
+  const im = $("#mdImport", box);
+  if (im) im.onclick = importData;
   const ex = $("#mdExport", box);
   if (ex) ex.onclick = () => { ex.disabled = true; exportData().catch((err) => toast(esc(err.message))).finally(() => (ex.disabled = false)); };
   const clear = () => {
@@ -199,6 +202,27 @@ async function exportData() {
   toast(`내보냈어요 — 구직자 ${d.seekers.length}명 · 지원 ${d.applications.length}건 · AI 테스트 기록 ${d.ailog.length}건. 다운로드 폴더의 파일을 results/ 폴더로 옮겨 올려 주세요.`);
 }
 $("#storeExport").onclick = () => exportData().catch((err) => toast(esc(err.message)));
+
+/* 결과 불러오기: 팀원이 올린 results/export_*.json 을 이 브라우저(또는 서버 저장소)에 합친다. 여러 파일 한 번에 가능 */
+const NAMES = { seekers: "구직자", companies: "기업", applications: "지원", postings: "공고", contracts: "계약서", payslips: "명세서", cases: "신청 건", ailog: "AI 기록" };
+function importData() {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "application/json,.json"; inp.multiple = true;
+  inp.onchange = async () => {
+    const done = [];
+    for (const f of inp.files) {
+      try {
+        if (f.size > 15 * 1024 * 1024) throw new Error("15MB 이하 파일만 불러올 수 있어요.");
+        const counts = await S.importAll(JSON.parse(await f.text()), f.name);
+        done.push(`<b>${esc(f.name)}</b>: ${Object.entries(counts).map(([c, n]) => `${NAMES[c] || c} ${n}`).join(" · ")}`);
+      } catch (err) { done.push(`<b>${esc(f.name)}</b>: 불러오지 못함 — ${esc(err instanceof SyntaxError ? "JSON 형식이 아니에요" : err.message)}`); }
+    }
+    toast(`결과를 불러왔어요 (같은 항목은 새 파일 내용으로 덮어씀)<br>${done.join("<br>")}`);
+    stats(); seekerInbox(); if ($("#coGrid") && !E.co) renderCompanies();
+  };
+  inp.click();
+}
+$("#storeImport").onclick = importData;
 
 function showWork(fresh) {
   $("#empCompanies").hidden = true; $("#empWork").hidden = false;
