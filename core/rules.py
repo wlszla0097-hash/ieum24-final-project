@@ -173,7 +173,8 @@ def posting_check(post: dict) -> dict:
     else:
         add(OK if n >= 5 else CHECK, "피보험자 수", f"{n}명" + ("" if n >= 5 else " — 5인 미만은 일부 예외 업종만 가능하니 지침 확인"))
 
-    wage, raw_hrs = post.get("wage"), post.get("weekly_hours")
+    whole = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v  # noqa: E731 — 계약서 값(2300000.0)을 '2,300,000원'으로
+    wage, raw_hrs = whole(post.get("wage")), whole(post.get("weekly_hours"))
     hrs = raw_hrs or 40
     if isinstance(raw_hrs, (int, float)):
         add(OK if raw_hrs >= WEEKLY_MIN else BAD, "주 소정근로시간",
