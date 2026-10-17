@@ -700,19 +700,28 @@ async function transfer(ym, batch) {
   const row = $(`#payRows .month-row[data-ym="${ym}"] [data-res]`), pend = E.pending[ym];
   if (!pend) return;
   if (row) row.innerHTML = '<span class="muted">AI가 이체확인증을 읽고 명세서와 대조하는 중…</span>';
+  let p = null;
   try {
-    let p = await S.get("payslips", psId(ym));
+    p = await S.get("payslips", psId(ym));
     if (!p) p = await issue(ym);
     const prev = (await S.list("payslips")).filter((x) => x.contract_id === p.contract_id && !x.voided && x.ym < ym).map((x) => ({ ym: x.ym, gross: x.gross }));
     const res = await api("/api/certificate", { method: "POST", timeoutMs: 45000, body: { kind: "claimdoc", consent: true, month: ym, files: [pend.file],
       issued_payslip: { name: p.worker, ym, pay_date: p.pay_date, gross: String(p.gross), deduction: String(p.dedTotal), net: String(p.net) },
       sample_truth: pend.truth, ctx: { worker: p.worker, company: p.company, hire_date: E.ct.fields.start_date, weekly_hours: C.hours(E.ct.fields).weekly || 40, history: prev, prorate: p.prorate || undefined } } });
-    p.transfer = { kind: pend.kind === "file" ? "첨부 파일" : pend.label, read: res.transfer, read_source: res.source, model: res.model || "" };
+    p.transfer = { kind: pend.kind === "file" ? "첨부 파일" : pend.label, read: res.transfer, read_raw: res.transfer_raw || null, read_source: res.source, model: res.model || "" };
     p.check = { level: res.check.level, items: res.check.items };
     await S.put("payslips", p.id, p);
     delete E.pending[ym];
     if (!batch) { await syncCase(false); drawPayRows(); }
-  } catch (err) { if (row) row.innerHTML = `<div class="msg error">${esc(err.message)}</div>`; if (batch) throw err; }
+  } catch (err) {
+    // AI 판독이 실패해도 흐름은 멈추지 않는다: 그 달은 '미판독·확인 필요'로 남기고 다음 달로 (첨부는 남겨 다시 판독 가능)
+    if (p && p.id) {
+      p.check = { level: "확인 필요", items: [{ level: "확인 필요", item: "이체확인증 판독", detail: `AI 판독 실패(${err.message}) — 미판독 상태, 원본 확인 또는 [AI 판독 · 대조] 다시 실행`, basis: "이음24" }] };
+      await S.put("payslips", p.id, p).catch(() => {});
+    }
+    if (row) row.innerHTML = `<div class="msg error">${esc(err.message)} — 이 달은 '확인 필요(미판독)'로 남겨 두었어요.</div>`;
+    if (!batch && p) { await syncCase(false); }
+  }
 }
 function docsOf(pays) {
   const by = Object.fromEntries(pays.map((p) => [p.ym, p])), ms = payMonths();
@@ -735,13 +744,13 @@ function summary(pays) {
 async function syncCase(rebuild) {
   const ct = E.ct, cs = await S.get("cases", ct.case_id); if (!cs) return;
   const docs = docsOf((await S.list("payslips")).filter((p) => p.contract_id === ct.id && !p.voided));
-  let core = { checklist: cs.base_checklist || cs.checklist, status: cs.status_base || cs.status, schedule: cs.schedule, evidence: cs.evidence, as_of: cs.as_of, contract: cs.contract };
+  let core = { checklist: cs.base_checklist || cs.checklist, status: cs.status_base || cs.status, schedule: cs.schedule, evidence: cs.evidence, as_of: cs.as_of, contract: cs.contract, manual: cs.manual };
   if (rebuild && docs.uploaded === docs.expected) {
     const six = cs.schedule.six_month_date, asOf = six > today() ? six : "";
     try {
       const r = await api("/api/cases", { method: "POST", timeoutMs: 20000, body: { posting: ct.posting_form, posting_id: ct.posting_id, applicant_id: ct.applicant_id,
         hire_date: ct.fields.start_date, contract: C.toCheck(ct.fields), applicant: ct.applicant || undefined, as_of: asOf || undefined } });
-      core = { checklist: r.case.checklist, status: r.case.status, schedule: r.case.schedule, evidence: r.case.evidence, as_of: r.case.as_of, contract: r.case.contract };
+      core = { checklist: r.case.checklist, status: r.case.status, schedule: r.case.schedule, evidence: r.case.evidence, as_of: r.case.as_of, contract: r.case.contract, manual: r.case.manual };
     } catch (e) { /* 다시 정리하지 못하면 기존 건 유지 */ }
   }
   const checklist = [...core.checklist];

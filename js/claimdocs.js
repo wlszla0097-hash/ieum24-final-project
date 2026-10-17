@@ -158,7 +158,7 @@ function summary() {
       <div><small>첨부</small><b>${done.length}/${ms.length}개월</b></div>
       <div><small>불일치 · 확인 필요</small><b>${mis.length} · ${chk.length}</b></div>
       <div><small>평균 월 지급총액</small><b>${won(avg)}원</b></div>
-      <div><small>1회차 신청 가능</small><b>${open1}부터</b></div></div>
+      <div><small>1회차 지급신청 검토</small><b>${open1}부터 (참여신청 기업)</b></div></div>
     ${mis.length ? `<p class="msg info">${mis.map((m) => `${Number(m.slice(5))}월분`).join(", ")} 서류에 서로 다른 값이 있습니다. 신청 전에 정정 서류(추가 이체 내역 등)를 함께 올려 두세요.</p>` : ""}
     ${missing.length ? `<p class="meta">아직 올리지 않은 달: ${missing.join(", ")}</p>` : ""}
     <button class="btn primary block" id="docsSend" type="button" ${done.length ? "" : "disabled"}>점검된 서류를 담당자 확인 대시보드 신청 건에 연결 (시연)</button>`;

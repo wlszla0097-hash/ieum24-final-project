@@ -79,7 +79,7 @@ def parse_seeker(b: dict, today: date | None = None) -> dict:
         q = _date(b.get("kuchwi_qualified"), "국민취업지원제도 수급자격 인정일", today)
         prog = {"type": "국민취업지원제도", "qualified": q, "status": "참여"}
         if b.get("kuchwi_iap"):
-            prog["iap"] = q  # 취업활동계획 수립 여부만 받으므로 인정일로 기록 (실제 서비스는 고용24 이력)
+            prog["iap"], prog["iap_unknown"] = q, True  # 수립 '여부'만 받으므로 날짜는 모름 → 판정 근거에 '채용 전 수립 확인 필요' 표시
         programs.append(prog)
         if b.get("kuchwi_job_after"):
             insurance.append({"company": "참여 후 취업(본인 입력)", "acquired": q, "lost": ""})

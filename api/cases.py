@@ -49,23 +49,46 @@ def contract_from(post: dict, hire: date, given: dict | None) -> dict:
     return f
 
 
+# 자동으로 점검하지 않는 공통 요건 — '충족'으로 보이지 않게 담당자 확인 항목으로 따로 보여 준다 (2026 지침 기준)
+MANUAL = [
+    {"item": "사업 참여신청", "detail": "기업의 사업 참여신청 여부·신청일 — 먼저 채용한 경우 채용일부터 3개월 이내 참여신청 필요", "basis": "2026 지침 Ⅱ-1-7·Ⅲ-3-2"},
+    {"item": "실제 고용유지", "detail": "6개월 동안 퇴사·휴직·고용보험 상실이 없었는지 — 급여 서류만으로 확정하지 않음", "basis": "2026 지침 Ⅲ-4·Ⅴ-2-3"},
+    {"item": "채용일 현재 취업 여부", "detail": "채용일에 다른 곳 고용보험 가입 중·사업자등록 중이면 대상 아님", "basis": "2026 지침 Ⅲ-1-2"},
+    {"item": "기업 공통 요건", "detail": "고용보험료 체납, 고용조정(감원), 사업주 가족관계·중복 지원, 기준 피보험자 수 산정기간", "basis": "2026 지침 Ⅱ-1-2·Ⅱ-2"},
+]
+
+
 def build_case(post: dict, app: dict, hire: date, contract: dict | None = None, today: date | None = None) -> dict:
-    j = judge(app, post, app.get("consent", False), hire=hire)
-    pc = posting_check(post)
-    cc = contract_check(contract_from(post, hire, contract))
+    cf = contract_from(post, hire, contract)
+    # 채용 후에는 공고가 아니라 실제 계약 조건(고용형태·임금·근로시간)으로 다시 판단한다
+    real = {**post, "emp_type": "정규직" if cf.get("employment_type") in (None, "", "정규직") else cf["employment_type"],
+            "wage": cf.get("base_wage") or post.get("wage"), "weekly_hours": cf.get("weekly_hours") or post.get("weekly_hours")}
+    j = judge(app, real, app.get("consent", False), hire=hire)
+    pc = posting_check(real)
+    cc = contract_check(cf)
     sch = schedule(hire, today)
+    detail_ok = app.get("detail_consent", app.get("consent"))
     if j["type"] == "non_capital":
         evidence = {"open": True, "title": "비수도권 유형 — 청년 연령 확인", "lines": ["취업애로 요건 없이 청년(만 15~34세) 채용 시 대상. 연령은 고용24 회원 정보로 확인"]}
-    elif j["eligible"] and app.get("detail_consent", app.get("consent")):  # 채용 후 세부정보 열람 동의(지원자 선택)
-        evidence = {"open": True, "title": f"취업애로청년 근거: {j['reason']}", "lines": history_flags(app, before=hire)["evidence"]}
-    elif j["eligible"]:
+    elif not detail_ok:  # 판정 결과와 상관없이 동의부터 — 미동의면 참여사업·날짜·사유를 모두 숨긴다
         evidence = {"open": False, "title": "근로자 동의 전 — 참여 이력 근거 비공개", "lines": ["지원자가 '채용 후 세부정보 열람'에 동의하지 않았습니다. 신청 시 근로자 본인의 동의가 필요합니다."]}
+    elif j["eligible"]:
+        evidence = {"open": True, "title": f"취업애로청년 근거: {j['reason']}", "lines": history_flags(app, before=hire)["evidence"]}
     else:
         evidence = {"open": True, "title": "취업애로청년 근거 미확인",
                     "lines": history_flags(app, before=hire)["evidence"] + ["참여 이력에서 해당 근거가 확인되지 않음 — 다른 요건 해당 여부는 고용센터 확인"]}
-    checklist = [i for i in pc["items"] if i["item"] != "지원 유형"]
-    checklist.append({"level": "충족" if sch["months_kept"] >= 6 else CHECK, "item": "고용유지 6개월",
-                      "detail": f"채용 {sch['hire_date']} → {sch['months_kept']}개월 경과 (6개월 시점 {sch['six_month_date']})", "basis": GUIDE_YOUTH})
+    checklist = []
+    for i in pc["items"]:
+        if i["item"] == "지원 유형":
+            continue
+        if i["item"] == "고용형태" and i["level"] == BAD:  # 실제 계약이 기간제
+            i = {**i, "level": CHECK, "detail": f"실제 계약 '{real['emp_type']}' — 기간의 정함 없는 계약이 원칙. 수습 3개월 이내, 기간제 채용 후 3개월 이내 정규직 전환(전환일부터 유지기간 계산) 등 예외는 확인",
+                 "basis": "2026 지침 Ⅲ-3-1"}
+        checklist.append(i)
+    passed = sch["months_kept"] >= 6
+    checklist.append({"level": "충족" if passed else CHECK, "item": "6개월 경과",
+                      "detail": f"채용 {sch['hire_date']} → {sch['months_kept']}개월 경과 (6개월 시점 {sch['six_month_date']}) — 날짜 기준이며 실제 고용유지는 아래 담당자 확인",
+                      "basis": GUIDE_YOUTH})
     issues = [r for r in cc if r["level"] != "적정"]
     checklist.append({"level": BAD if any(r["level"] == "위반 의심" for r in cc) else CHECK if issues else "충족", "item": "근로계약 점검",
                       "detail": " / ".join(f"{r['item']}: {r['detail']}" for r in issues) or "최저임금·근로시간·휴게·필수 기재사항 이상 없음",
@@ -73,7 +96,7 @@ def build_case(post: dict, app: dict, hire: date, contract: dict | None = None, 
     status = "보완 필요" if any(c["level"] == BAD for c in checklist) else "확인 필요" if any(c["level"] == CHECK for c in checklist) else "검토 대기"
     return {"case_id": f"C-{post['id']}-{app['id'].split('-')[-1]}-{hire:%m%d}", "company": post["company"], "region": post["region"],
             "title": post["title"], "worker": app["alias"], "hire_date": hire.isoformat(), "program": "청년일자리도약장려금",
-            "evidence": evidence, "checklist": checklist, "contract": cc, "schedule": sch, "status": status, "source": "합성 데이터(시연)"}
+            "evidence": evidence, "checklist": checklist, "manual": MANUAL, "contract": cc, "schedule": sch, "status": status, "source": "합성 데이터(시연)"}
 
 
 # 시연용 과거 채용 건 (합성). 참여 이력 날짜가 채용일보다 앞서도록 따로 둔다.

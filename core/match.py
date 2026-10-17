@@ -31,7 +31,7 @@ def rank(postings: list[dict], profile_text: str, job: str, region: str, today: 
         if p.get("tax_arrears"):  # 국세 고액·상습 체납 명단 기업은 임금체불과 같이 추천하지 않음
             excluded["tax_arrears"] += 1
             continue
-        if p.get("wage") and p["wage"] / monthly_hours(p.get("weekly_hours") or 40) + 0.5 < rate:
+        if p.get("wage") and p["wage"] < round(rate * monthly_hours(p.get("weekly_hours") or 40)):
             excluded["min_wage"] += 1  # 최저임금 미달로 보이는 공고는 추천하지 않음
             continue
         if d(p.get("close")) and d(p["close"]) < today:

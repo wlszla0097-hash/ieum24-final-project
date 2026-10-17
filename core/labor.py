@@ -54,24 +54,30 @@ def check(f: dict, today: date | None = None) -> list[dict]:
             add(OK, "휴게시간", f"휴게 {brk:g}분 (기준 {need}분 이상)", "근로기준법 제54조")
 
     rate = MIN_WAGE.get(year)
-    hourly, how = None, ""
+    hourly, how, ok_mw, base_ok = None, "", None, None
     if wage is None:
         how = "기본급 미입력"
     elif wtype == "시급":
         hourly, how = wage, "시급"
+        ok_mw = base_ok = bool(rate) and wage >= rate
     elif not weekly:
         how = "주 소정근로시간 미입력"
     else:
-        monthly = (wage / 12 if wtype == "연봉" else wage) + allow
+        base = wage / 12 if wtype == "연봉" else wage
+        monthly = base + allow
         hrs = monthly_hours(weekly)
         hourly, how = monthly / hrs, f"월 {monthly:,.0f}원 ÷ {hrs}시간"
+        if rate:  # 반올림 여유 없이 원 단위로 비교 (2026: 10,320원 × 209시간 = 2,156,880원)
+            ok_mw, base_ok = monthly >= round(rate * hrs), base >= round(rate * hrs)
     if hourly is None:
         add(CHECK, "최저임금", f"계산 불가 ({how})", "최저임금법 제6조")
     elif not rate:
         add(CHECK, "최저임금", f"{year}년 최저임금 미등록 — 고시 금액 확인 필요 (환산 시급 {hourly:,.0f}원)", "최저임금법 제6조")
-    elif hourly + 0.5 < rate:
-        need = f" — 월 환산 최소 {rate * monthly_hours(weekly):,}원 필요" if wtype != "시급" and weekly else ""
+    elif not ok_mw:
+        need = f" — 월 환산 최소 {round(rate * monthly_hours(weekly)):,}원 필요" if wtype != "시급" and weekly else ""
         add(VIOLATION, "최저임금", f"환산 시급 {hourly:,.0f}원 < {year}년 최저임금 {rate:,}원 [{how}]{need}", "최저임금법 제6조")
+    elif not base_ok:  # 수당을 더해야 넘는 경우: 그 수당이 최저임금에 산입되는지 따로 확인
+        add(CHECK, "최저임금", f"기본급만으로는 미달, 수당 포함 시 환산 시급 {hourly:,.0f}원 [{how}] — 수당의 최저임금 산입 여부 확인", "최저임금법 제6조")
     else:
         add(OK, "최저임금", f"환산 시급 {hourly:,.0f}원 ≥ {year}년 최저임금 {rate:,}원 [{how}]", "최저임금법 제6조")
 
