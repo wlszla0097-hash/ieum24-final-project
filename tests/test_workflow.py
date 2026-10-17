@@ -226,19 +226,19 @@ def test_portfolio_drops_repeats_puffery_and_invented_tech(monkeypatch):
            "- 개인 프로젝트: 할 일 관리 웹앱 (React, 로컬 저장), 깃허브에 코드 공개\n- 카페 아르바이트 1년: 주문 응대, 신규 직원 교육")
     ai_out = {"headline": "React로 화면을 만들어 본 신입 웹 개발 지원자",
               "summary": "부트캠프 480시간 동안 HTML, CSS, JavaScript, React를 배웠습니다. 팀과 개인 프로젝트로 화면을 직접 만들었습니다.",
-              "strengths": [{"title": "화면 구현", "evidence": "팀 프로젝트"}, "협업", "뛰어난 소통"],
+              "strengths": [{"title": "화면 구현", "evidence": "팀 프로젝트"}, "협업", "React 상태 관리"],
               "sections": [
                   {"title": "웹 개발 부트캠프", "body": "부트캠프 480시간 동안 HTML, CSS, JavaScript, React를 배웠습니다. 실무 중심의 프론트엔드 개발 능력을 키웠습니다."},
                   {"title": "지역 축제 웹사이트", "body": "4인 팀에서 메인 화면과 일정 필터 기능을 맡았습니다. Redux로 상태를 관리했습니다."},
                   {"title": "할 일 관리 웹앱", "body": "React로 할 일 관리 웹앱을 만들고 깃허브에 코드를 공개했습니다."},
-                  {"title": "카페 아르바이트", "body": "1년간 주문을 응대하고 신규 직원을 교육했습니다."}],
+                  {"title": "카페 아르바이트", "body": "1년간 주문을 응대하고 신규 직원을 교육했습니다. 체크리스트로 진행 상황을 관리했습니다. 이는 협업의 기초가 됩니다."}],
               "fit": "4인 팀에서 메인 화면과 일정 필터 기능을 맡은 경험이 있습니다. 화면 개발 업무를 바로 거들 수 있습니다.", "skills": ["React", "Redux"]}
     monkeypatch.setattr(seeker, "generate_json", lambda *a, **k: ai_out)
     r = seeker.portfolio({"ai_consent": True, "desire": {"job": "웹 개발"}, "points": [], "experience": exp})
     doc, rm = r["portfolio"], r["meta"]["removed"]
     assert doc.count("480시간") == 1 and doc.count("메인 화면과 일정 필터") == 1  # 같은 사실은 한 번만
-    assert "실무 중심" not in doc and "Redux" not in doc and "뛰어난" not in doc
-    assert rm == {"duplicate": 2, "puffery": 1, "unknown_term": 1}
+    assert "실무 중심" not in doc and "Redux" not in doc and "상태 관리" not in doc and "체크리스트" not in doc and "이는" not in doc
+    assert rm == {"duplicate": 3, "puffery": 1, "unknown_term": 2}
     assert "■ 강점\n화면 구현 · 협업" in doc and "• 카페 아르바이트 — 1년간 주문을 응대하고 신규 직원을 교육했습니다." in doc
     assert r["meta"]["chars"] == len(doc) < 700
 
