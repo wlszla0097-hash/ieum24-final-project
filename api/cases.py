@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from claimdocs import check_month, missing_months  # noqa: E402
 from common import ApiError, JsonHandler, num, text  # noqa: E402
-from labor import check as contract_check  # noqa: E402
+from labor import VIOLATION, check as contract_check  # noqa: E402
 from rules import BAD, CHECK, GUIDE_YOUTH, d, history_flags, judge, posting_check, schedule  # noqa: E402
 from userinput import parse_posting, parse_seeker  # noqa: E402
 from synthetic import applicants_for, posting  # noqa: E402
@@ -146,6 +146,14 @@ class handler(JsonHandler):
         contract = b.get("contract") if isinstance(b.get("contract"), dict) else None
         as_of = d(b.get("as_of"))  # 시연: 급여 6개월분을 미리 발급해 본 경우 그 시점 기준으로 계산
         case = build_case(post, app, hire, contract, today=as_of)
+        if contract:  # 지원제도와 상관없이 최저임금 미달 근로계약서는 만들지 않는다 (최저임금법 제6조 — 미달 부분은 무효)
+            mw = next((r for r in case.get("contract") or [] if r.get("item") == "최저임금" and r.get("level") == VIOLATION), None)
+            if mw:
+                raise ApiError(422, "min_wage", "최저임금에 미달하는 근로계약서는 저장할 수 없습니다. 임금을 고쳐 주세요.",
+                               {"item": "최저임금", "detail": mw.get("detail", ""), "basis": mw.get("basis", "최저임금법 제6조"),
+                                "law": "최저임금법 제6조 제1항·제3항: 사용자는 최저임금액 이상의 임금을 지급해야 하며, "
+                                       "최저임금액에 미치지 못하는 임금을 정한 근로계약은 그 부분에 한해 무효로 하고 최저임금액과 같은 임금을 지급하기로 한 것으로 봅니다.",
+                                "penalty": "최저임금보다 적은 임금을 지급하면 3년 이하의 징역 또는 2천만원 이하의 벌금 (최저임금법 제28조 제1항)"})
         if as_of:
             case["as_of"] = as_of.isoformat()
         return {"ok": True, "case": case}

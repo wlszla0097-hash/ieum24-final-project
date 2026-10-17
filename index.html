@@ -111,13 +111,21 @@
               <details class="policy"><summary>상세내용 보기</summary><dl>
                 <dt>처리 항목</dt><dd>올린 파일(이미지·PDF). 서류에 성명·생년월일이 있으면 그대로 AI 서버로 전송되므로, 가능하면 해당 부분을 가리고 올려 주세요.</dd>
                 <dt>추출 항목</dt><dd>사업명·과정명·발급기관·날짜만. 성명·생년월일은 출력하지 않도록 지시하며 서버도 정해진 항목만 돌려줍니다.</dd>
-                <dt>처리 위탁·국외 이전</dt><dd>AI 처리 동의와 같습니다 (코디세이 교육용 게이트웨이 → Anthropic, 미국).</dd>
+                <dt>처리 위탁·국외 이전</dt><dd>AI 처리 동의와 같습니다 (코디세이 교육용 게이트웨이 → Anthropic 또는 OpenAI, 미국).</dd>
                 <dt>보유 기간</dt><dd>파일과 판독 결과를 서버에 저장하지 않습니다.</dd></dl></details>
               <div class="cert-row"><input type="file" id="certFile" accept="image/png,image/jpeg,image/webp,application/pdf" aria-label="증빙 파일 선택">
                 <button class="btn ghost" id="certBtn" type="button">AI로 읽기</button></div>
               <div id="certResult"></div>
             </div>
             <label class="check"><input type="checkbox" id="youth" name="youth" checked> 만 15~34세 청년입니다 <small class="muted">(나이는 저장·전송하지 않고 해당 여부만 사용)</small></label>
+            <div class="prog-box" id="milWrap" hidden>
+              <label class="check"><input type="checkbox" id="mil" name="mil"> <span><b>만 35~39세 군필자</b>예요 (병역 의무복무를 마침)<br><small class="muted">군필자는 복무기간만큼 청년 연령이 늘어나요 (최고 만 39세)</small></span></label>
+              <div class="sub" data-for="mil" hidden>
+                <div class="row2"><div class="field"><label for="mil_age">만 나이 <em>*</em></label><select id="mil_age" name="mil_age"><option value="">선택</option><option>35</option><option>36</option><option>37</option><option>38</option><option>39</option></select></div>
+                  <div class="field"><label for="mil_months">의무복무 기간(개월) <em>*</em></label><input type="number" id="mil_months" name="mil_months" min="1" max="72" inputmode="numeric" placeholder="예: 육군 18"></div></div>
+                <p class="muted">이 경우에만 만 나이·복무 개월 수를 판단에 써요. 기업 화면에는 보이지 않아요. 생일·전역일에 따른 경계는 고용센터에서 최종 확인해요.</p>
+              </div>
+            </div>
           </fieldset>
           <div class="field"><label for="experience">2. 내 경험 <em>*</em> <small class="muted">훈련·상담·프로젝트·자격·아르바이트 등 자유롭게</small></label>
             <textarea id="experience" name="experience" rows="7" maxlength="1500" placeholder="예)&#10;- 내일배움카드 웹 개발 과정 수료 (HTML, CSS, JavaScript), 2026년 9월&#10;- 팀 프로젝트로 동네 맛집 지도 웹사이트 제작, 화면 담당&#10;- 카페 아르바이트 1년 — 재고 정리, 고객 응대"></textarea><span class="counter" data-for="experience">0/1500</span></div>
@@ -142,7 +150,7 @@
               <label class="check"><input type="checkbox" name="agree_ai" data-consent="AI 처리(처리위탁·국외이전)"> <span><b class="req">[AI 기능 사용 시 필수]</b> 입력 내용을 AI로 정리하는 데 동의합니다.</span></label>
               <details class="policy"><summary>상세내용 보기</summary><dl>
                 <dt>처리 내용</dt><dd>이력 정리·역량 문장·자기소개 초안·포트폴리오 초안 작성, 증빙 서류 판독(별도 동의 시)</dd>
-                <dt>처리 위탁·국외 이전</dt><dd>입력 내용이 AI 중계 서버(코디세이 교육용 게이트웨이, copa.codyssey.kr)를 거쳐 AI 제공사(Anthropic, 미국)의 모델로 전송됩니다. 전송 시점: 버튼을 누를 때. 전송 방법: 암호화(HTTPS) 통신.</dd>
+                <dt>처리 위탁·국외 이전</dt><dd>입력 내용이 AI 중계 서버(코디세이 교육용 게이트웨이, copa.codyssey.kr)를 거쳐 AI 제공사(Anthropic 또는 OpenAI, 미국)의 모델로 전송됩니다. 전송 시점: 버튼을 누를 때. 전송 방법: 암호화(HTTPS) 통신.</dd>
                 <dt>전송 항목</dt><dd>내 경험·희망 직무·지역, 참여 사업 종류와 날짜. 나이 숫자·성명·연락처는 보내지 않습니다.</dd>
                 <dt>보유 기간</dt><dd>이음24 서버는 저장하지 않습니다. 중계 서버·AI 제공사의 보관은 각 사업자 정책을 따르며, 실제 운영 전 계약으로 확정할 예정입니다.</dd>
                 <dt>거부 권리와 영향</dt><dd>거부해도 규칙 기반 기본 정리와 공고 추천은 이용할 수 있습니다. 이 경우 입력 내용은 AI 서버로 전송되지 않습니다.</dd></dl></details>
@@ -214,7 +222,7 @@
           <h3 class="top-gap">기본 예시 기업 <small class="muted">사업자번호 미등록 — 공공데이터 조회 없이 공고 입력값으로만 점검</small></h3>
           <div class="co-grid" id="coGridEtc"></div>
           <p class="meta">회사·공고·지원자·서류는 모두 합성(가상) 데이터입니다. 실제 개인정보를 입력하지 마세요.
-            <button class="btn ghost sm" id="storeExport" type="button">저장 데이터 내보내기(JSON)</button> <button class="btn ghost sm" id="storeReset" type="button">시연 데이터 초기화</button></p>
+            <button class="btn ghost sm" id="storeExport" type="button">저장 데이터 내보내기(JSON)</button> <button class="btn ghost sm" id="storeImport" type="button">결과 불러오기(JSON)</button> <button class="btn ghost sm" id="storeReset" type="button">시연 데이터 초기화</button></p>
         </div>
       </div>
       <div id="empWork" hidden>

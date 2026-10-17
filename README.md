@@ -19,6 +19,7 @@
 
 - `main`에 직접 올리지 않습니다. 각자 브랜치(`seeker-data-이름`) → Pull Request, 합치기는 팀장이 합니다.
 - 구직자 합성데이터는 **사람별 파일**에만 넣습니다: 지수 `data/synthetic/seekers_A.json`(P-A01~), 홍주 `seekers_B.json`(P-B01~). `seekers.json`은 수정하지 않습니다.
+- 테스트 결과는 구직자 화면 [📥 내 서류함] → **[📤 테스트 결과 내보내기(JSON)]** 파일을 `results/`에 넣어 같은 PR로 올립니다 (개발 서버를 끄면 결과가 사라지므로 끄기 전에). 팀장은 [결과 불러오기(JSON)]로 여러 파일을 한 브라우저에 합칩니다. 방법: [results/README.md](results/README.md)
 - PR 전 확인: `python3 tools/check_synthetic.py`(✖ 없음) · `python3 -m pytest -q tests`(모두 통과)
 - API 키는 `.env`(내 컴퓨터)와 Vercel 환경 변수에만 둡니다.
 
@@ -53,7 +54,7 @@
 
 ## 기술 스택
 
-- **AI**: Claude API(claude-haiku-4-5) 또는 Gemini API — 둘 중 하나, 교육용 게이트웨이 사용 가능
+- **AI**: Anthropic API(claude-haiku-4-5) · OpenAI API(gpt-4o-mini) · Gemini API 중 하나 — 교육용 게이트웨이(중계 주소) 사용 가능, `AI_MODEL`로 모델 변경
 - **Backend**: Python 표준 라이브러리만 사용한 Vercel Serverless Functions (`api/*.py`)
 - **Frontend**: HTML, CSS, Vanilla JavaScript (빌드 도구 없음)
 - **Data**: 고용24 OpenAPI 채용정보(키가 없으면 합성 공고), 2026년 청년일자리도약장려금 사업운영 지침(규칙DB), 고용노동부 표준근로계약서 양식

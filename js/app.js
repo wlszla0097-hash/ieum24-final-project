@@ -58,7 +58,9 @@ async function api(path, { method = "GET", body, timeoutMs = 45000, onSlow, head
     try { data = await res.json(); } catch (e) { /* JSON 아닌 응답 */ }
     if (!res.ok || !data || data.ok === false) {
       const fallback = res.status >= 500 ? "서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도하세요." : "요청을 처리하지 못했습니다. 입력값을 확인하세요.";
-      throw new Error(`${(data && data.message) || fallback} (오류 코드 ${res.status})`);
+      const e = new Error(`${(data && data.message) || fallback} (오류 코드 ${res.status})`);
+      if (data) Object.assign(e, { code: data.error, detail: data.detail });
+      throw e;
     }
     return data;
   } catch (err) {
@@ -85,7 +87,7 @@ $$("textarea[maxlength]").forEach((ta) => ta.addEventListener("input", () => {
 
 const fmt = (n) => (n || n === 0 ? Number(n).toLocaleString("ko-KR") : "");
 /* ---------- 3. 구직자: 직접 쓴 경험 → AI 정리·역량 문장·공고 추천 ---------- */
-const SEEK_FIELDS = ["alias", "kuchwi", "kuchwi_qualified", "kuchwi_iap", "kuchwi_job_after", "dojeon", "dojeon_completed", "youth", "experience", "job", "region",
+const SEEK_FIELDS = ["alias", "kuchwi", "kuchwi_qualified", "kuchwi_iap", "kuchwi_job_after", "dojeon", "dojeon_completed", "youth", "mil", "mil_age", "mil_months", "experience", "job", "region",
   "consent", "agree_privacy", "agree_ai", "agree_detail", "agree_cert"];
 const CONSENT_VERSION = "2026-10-10-v1";
 const seekEl = (k) => $(`#seekForm [name="${k}"]`);
@@ -146,9 +148,11 @@ function fillForm(root, values, names) {
   });
 }
 function syncProgramBoxes() {
+  $("#milWrap").hidden = $("#youth").checked;  // 만 15~34세가 아닐 때만 군필 연령 연동 확인
+  if ($("#milWrap").hidden) $("#mil").checked = false;  // 청년(15~34)에 체크하면 군필 연동 입력은 쓰지 않음
   $$(".sub[data-for]").forEach((s) => (s.hidden = !$("#" + s.dataset.for).checked));
 }
-["kuchwi", "dojeon"].forEach((id) => $("#" + id).addEventListener("change", syncProgramBoxes));
+["kuchwi", "dojeon", "youth", "mil"].forEach((id) => $("#" + id).addEventListener("change", syncProgramBoxes));
 
 async function loadSeekExamples() {
   if (state.seekExamples.length) return;
@@ -160,6 +164,7 @@ async function loadSeekExamples() {
 $("#seekExample").addEventListener("change", (e) => {
   const x = state.seekExamples.find((v) => v.id === e.target.value);
   if (!x) return;
+  state.exampleId = x.id;  // AI 테스트 기록에 어떤 합성 구직자로 돌렸는지 남김
   ["kuchwi", "kuchwi_iap", "kuchwi_job_after", "dojeon"].forEach((k) => (seekEl(k).checked = false));
   ["kuchwi_qualified", "dojeon_completed"].forEach((k) => (seekEl(k).value = ""));
   fillForm($("#seekForm"), x.form, SEEK_FIELDS.filter((k) => k !== "consent"));
@@ -174,6 +179,7 @@ $("#seekForm").addEventListener("submit", async (e) => {
   const need = [["experience", "내 경험"], ["job", "희망 직무"]];
   if (body.kuchwi) need.push(["kuchwi_qualified", "국민취업지원제도 수급자격 인정일"]);
   if (body.dojeon) need.push(["dojeon_completed", "청년도전지원사업 수료일"]);
+  if (!body.youth && body.mil) need.push(["mil_age", "만 나이"], ["mil_months", "의무복무 기간(개월)"]);
   const missing = need.filter(([k]) => !body[k]);
   missing.forEach(([k]) => seekEl(k).classList.add("invalid"));
   if (missing.length) return showMsg(msg, `필수값을 입력하세요: ${missing.map(([, l]) => l).join(", ")}`);
@@ -185,8 +191,13 @@ $("#seekForm").addEventListener("submit", async (e) => {
   revealOnMobile(out);
   try {
     const extra = window.IeumFlow ? await window.IeumFlow.extraPostings() : [];  // 기업 화면에서 게시한 공고도 추천 후보에
+    const t0 = performance.now();
     const data = await api("/api/seeker", { method: "POST", body: { ...body, extra_postings: extra },
       onSlow: () => (out.innerHTML = loadingHtml("AI 응답이 평소보다 늦어지고 있어요. 조금만 기다려 주세요 (최대 45초)")) });
+    logAI("이력 정리·공고 추천", body, t0, { model: data.meta.ai_used ? data.meta.model : "", ai_used: !!data.meta.ai_used, guard_blocked: data.meta.guard_blocked ?? null,
+      error: data.meta.ai_used ? "" : data.meta.ai_error || "",
+      result: { competencies: data.competencies.map((c) => c.text), resume_intro: data.resume_intro || "",
+        jobs: data.jobs.map((j) => ({ id: j.id, company: j.company, title: j.title, eligible: !!(j.badge && j.badge.eligible), badge_shown: !!(j.badge && j.badge.show) })) } });
     state.points = data.activities.map((a) => a.name);
     state.profile = { ...body, points: state.points };
     state.headline = data.competencies[0]?.text || "";
@@ -199,6 +210,14 @@ $("#seekForm").addEventListener("submit", async (e) => {
     btn.disabled = false; btn.textContent = "AI로 이력 정리 · 공고 추천";
   }
 });
+
+/** AI 호출 1회 기록 → 시연 데이터 ailog 에 저장 (모델 비교용, [테스트 결과 내보내기]에 포함). 실패해도 화면 흐름은 계속 */
+function logAI(kind, body, t0, rec) {
+  if (!window.IeumStore) return;
+  const at = new Date().toISOString(), id = `${at.replace(/[^\d]/g, "").slice(0, 17)}-${Math.random().toString(36).slice(2, 6)}`;
+  window.IeumStore.put("ailog", id, { at, kind, ms: Math.round(performance.now() - t0), example_id: state.exampleId || "", alias: body.alias || "",
+    seeker_id: window.IeumStore.me(), job: body.job || "", ...rec }).catch(() => {});
+}
 
 function renderSeeker({ activities, competencies, resume_intro, jobs, programs, meta }) {
   const aiNote = meta.ai_used
@@ -243,11 +262,13 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     const b = $("#pfAi"), m = $("#pfMsg"), body = readSeekForm();
     if (!body.agree_ai) return (m.textContent = "AI 처리 동의(4번 두 번째 항목)가 필요해요. 직접 작성해도 됩니다.");
     b.disabled = true; m.textContent = "AI가 초안을 쓰고 있어요…";
+    const t0 = performance.now();
     try {
       const r = await api("/api/seeker", { method: "POST", body: { ...body, action: "portfolio" } });
+      logAI("포트폴리오 초안", body, t0, { model: r.meta.model, ai_used: true, guard_blocked: r.meta.guard_blocked, result: { portfolio: r.portfolio } });
       $("#pfText").value = r.portfolio;
       m.textContent = `초안 완료 · 원문에 없는 내용으로 차단된 문단 ${r.meta.guard_blocked}개 · 고친 뒤 등록하세요.`;
-    } catch (err) { m.textContent = err.message; } finally { b.disabled = false; }
+    } catch (err) { logAI("포트폴리오 초안", body, t0, { ai_used: false, error: err.message }); m.textContent = err.message; } finally { b.disabled = false; }
   });
   $("#pfSave").addEventListener("click", async () => {
     state.portfolio = $("#pfText").value.trim();
@@ -261,6 +282,7 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     try {
       await window.IeumFlow.apply(job);
       b.textContent = "지원 완료 ✓";
+      window.IeumFlow.seekerInbox();  // 내 서류함 '지원 현황'에 바로 반영
       toast(`${esc(job.company)}에 지원했어요. <a href="#employer">기업 화면</a>에서 이 회사를 고르면 지원자 목록에 내 지원서가 보여요.`);
     } catch (err) { b.disabled = false; b.textContent = "이 공고에 지원"; toast(esc(err.message)); }
   }));

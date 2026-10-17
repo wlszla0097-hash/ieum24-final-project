@@ -129,11 +129,11 @@ function shrink(src, max = 240) {
 }
 
 /* ---------- 근로자 서명 창: 직접 그리기 / 인장 이미지 올리기 ---------- */
-function openSign(name) {
+function openSign(name, who = "근로자") {
   return new Promise((resolve) => {
     const dlg = document.createElement("dialog"); dlg.className = "sign-dlg";
     dlg.innerHTML = `<form method="dialog" class="sign-box">
-      <h3>근로자 서명 — ${esc(name)}</h3>
+      <h3>${esc(who)} 서명 — ${esc(name)}</h3>
       <div class="tabs" role="tablist"><button type="button" class="tab active" data-tab="draw">✍ 직접 서명</button><button type="button" class="tab" data-tab="seal">🔴 인장 이미지</button></div>
       <div data-pane="draw"><canvas class="sign-pad" width="460" height="180" aria-label="서명 그리는 곳"></canvas>
         <div class="btn-row"><button type="button" class="btn ghost sm" data-clear>지우기</button><span class="muted">마우스나 손가락으로 서명하세요.</span></div></div>

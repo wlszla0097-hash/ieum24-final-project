@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 
 os.environ["IEUM_BUILTIN_ONLY"] = "1"
-for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "VERCEL"):
+for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "KV_REST_API_URL", "KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "VERCEL"):
     os.environ.pop(k, None)
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "api"))
@@ -160,3 +160,19 @@ def test_prorated_first_month_min_wage_compares_worked_days():
     assert lv(r) == "일치" and "일할 17/31일" in str(r["check"]["items"])
     bad = certificate.claimdoc({**body, "ctx": {**body["ctx"], "prorate": {"days": 40, "dim": 31}}})  # 잘못된 값은 무시
     assert lv(bad) == "불일치"
+
+
+def test_contract_below_min_wage_is_rejected_with_basis():
+    """지원사업과 무관하게 최저임금 미달 근로계약서는 저장 거부 + 근거(계산·조항) 반환"""
+    h = cases.handler.__new__(cases.handler)
+    base = {"posting": POST, "posting_id": "U-test", "applicant_id": "U-test-Sabc", "applicant": {"alias": "정다온", "profile": SEEK}, "hire_date": "2026-10-15"}
+    ok_ct = {"employment_type": "정규직", "wage_type": "월급", "start_date": "2026-10-01", "end_date": "", "base_wage": 2500000, "allowances": 0,
+             "weekly_hours": 40, "daily_hours": 8, "break_minutes": 60, "has_holiday": True, "has_leave": True, "has_place": True, "has_job": True, "has_payday": True}
+    h.read_json = lambda max_body=0: {**base, "contract": ok_ct}
+    assert h.handle_post()["ok"]
+    h.read_json = lambda max_body=0: {**base, "contract": {**ok_ct, "base_wage": 1500000}}
+    with pytest.raises(ApiError) as e:
+        h.handle_post()
+    assert e.value.status == 422 and e.value.code == "min_wage"
+    d = e.value.detail
+    assert "최저임금" in d["detail"] and "제6조" in d["law"] and "제28조" in d["penalty"]

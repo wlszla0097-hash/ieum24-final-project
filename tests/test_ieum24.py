@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 sys.path.insert(0, str(ROOT / "api"))
-for k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "WORK24_KEY"):
+for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "WORK24_KEY"):
     os.environ.pop(k, None)
 
 import pytest  # noqa: E402
@@ -236,3 +236,42 @@ def test_certificate_claimdoc_without_ai_uses_sample_truth():
     assert r["source"] == "synthetic_truth" and r["check"]["level"] == "일치"
     with pytest.raises(ApiError):
         certificate.claimdoc({"kind": "claimdoc", "month": "2026-05", "files": [img, img]})  # 실제 서류는 AI 없이 판독 불가
+
+
+def test_military_service_extends_youth_age():
+    """군필자는 의무복무기간만큼 청년 연령 연동 (최고 만 39세). 만 N세 0개월 기준: N*12 - 복무개월 < 35*12"""
+    from rules import is_youth, mil_youth
+    assert is_youth(34) and not is_youth(35)
+    assert is_youth(36, 18) and not is_youth(38, 18)          # 36세-18개월=34.5세 / 38세-18개월=36.5세
+    assert is_youth(35, 1) and not is_youth(37, 24)           # 37세-24개월=35세 → 초과(만 35세 미만이어야)
+    assert is_youth(39, 60) and not is_youth(40, 72)          # 최고 만 39세
+    assert not mil_youth(30, 18) and not is_youth(36, 0)      # 34세 이하는 연동 불필요, 미복무는 연장 없음
+
+
+def test_seeker_form_military_fields_validated_and_judged():
+    import userinput
+    from rules import judge
+    form = {"agree_privacy": True, "experience": "물류관리 실무 과정 수료, 재고 관리 경험", "job": "물류", "region": "경기",
+            "dojeon": True, "dojeon_completed": "2026-06-26", "youth": False}
+    plain = userinput.parse_seeker(form, today=date(2026, 10, 17))
+    assert plain["age"] == 40 and plain["military_months"] == 0
+    p = userinput.parse_seeker({**form, "mil": True, "mil_age": "36", "mil_months": "18"}, today=date(2026, 10, 17))
+    assert p["age"] == 36 and p["military_months"] == 18
+    post = {"emp_type": "정규직", "region": "경기 수원시", "priority": True, "industry": "물류"}
+    j = judge(p, post, True)
+    assert j["eligible"] and "군필" in j["reason"] and "고용센터" in j["seeker_text"]
+    assert not judge(plain, post, True)["eligible"]
+    young = userinput.parse_seeker({**form, "youth": True, "mil": True, "mil_age": "36", "mil_months": "18"}, today=date(2026, 10, 17))
+    assert young["age"] == 25 and young["military_months"] == 0  # 청년 체크 시 군필 입력은 무시
+    for bad in ({"mil_age": "41", "mil_months": "18"}, {"mil_age": "36", "mil_months": "0"}, {"mil_age": "", "mil_months": "18"}):
+        with pytest.raises(ApiError):
+            userinput.parse_seeker({**form, "mil": True, **bad}, today=date(2026, 10, 17))
+
+
+def test_persona_form_carries_military_fields():
+    import userinput
+    p = {"alias": "강태오", "age": 36, "military_months": 18, "desire": {"job": "물류", "region": "경기"},
+         "activities": [{"name": "물류관리 실무", "done": "2026-08-28"}], "programs": [], "insurance": []}
+    f = userinput.persona_to_form(p)
+    assert f["youth"] is False and f["mil"] is True and f["mil_age"] == "36" and f["mil_months"] == "18"
+    assert userinput.persona_to_form({**p, "age": 27})["mil"] is False

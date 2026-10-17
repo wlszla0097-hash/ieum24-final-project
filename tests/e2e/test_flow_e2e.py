@@ -31,7 +31,7 @@ def _free_port():
 
 def _server(extra_env=None):
     port = _free_port()
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("ANTHROPIC", "GEMINI", "KV_", "UPSTASH"))}
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("ANTHROPIC", "OPENAI", "GEMINI", "KV_", "UPSTASH"))}
     env.update({"PORT": str(port), "VERCEL": "", **(extra_env or {})})
     if not env["VERCEL"]:
         env.pop("VERCEL")
@@ -256,12 +256,19 @@ def test_contract_rules_and_signature_reset(app):
     jid = seeker_apply(pg)
     open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
     draw_sign(pg)
+    wage = pg.input_value('[data-f="base_wage"]')
     pg.fill('[data-f="base_wage"]', "1500000")  # 바꾸면 서명 다시 받아야 함
     pg.wait_for_selector("#ctDoc [data-sign]")
     pg.fill('[data-f="b_end"]', "12:30")
+    pg.click("#ctSave")  # 최저임금 미달 → 저장 거부, 근거 표시
+    pg.wait_for_selector("#ctMsg:not([hidden]) >> text=최저임금 미달", timeout=20000)
+    m = pg.inner_text("#ctMsg")
+    assert "저장할 수 없어요" in m and "최저임금법 제6조" in m and "제28조" in m and "월 환산 최소" in m
+    assert "invalid" in pg.get_attribute('[data-f="base_wage"]', "class") and stored(pg, "contracts") == []
+    pg.fill('[data-f="base_wage"]', wage)  # 고치면 저장됨 (휴게 위반은 점검 결과로 표시)
     save_contract(pg)
     res = pg.inner_text("#ctResult")
-    assert "최저임금" in res and "위반 의심" in res and "근로자 서명 대기" in res
+    assert "휴게시간" in res and "위반 의심" in res and "근로자 서명 대기" in res and pg.is_hidden("#ctMsg")
     pg.select_option('[data-f="kind"]', "기간")
     assert pg.input_value('[data-f="end_date"]')  # 기간제 종료일 자동
     assert "기간의 정함이 있는" in pg.inner_text("#ctDoc")
@@ -438,7 +445,143 @@ def test_contract_change_voids_issued_payslips_keeps_history(app):
     assert len(ps) == 1 and ps[0]["voided"] and "계약 기간" in ps[0]["voided"]["reason"] and "정정" in ps[0]["id"]
     pg.click("#goPay"); pg.wait_for_selector("#payRows details.voided")
     assert "정정(취소)된 명세서 1건" in pg.inner_text("#payRows")
-    pg.goto(pg.base + "/#seeker"); pg.wait_for_selector("#myDocs .md-row")
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelector('#myDocs').textContent.includes('근로계약서 1건')")  # 화면 갱신 뒤에 확인
     t = pg.inner_text("#myDocs")
     assert "급여명세서 0건" in t and "정정(취소)된 명세서 1건" in t
+    assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 팀원 테스트 결과 전달 ----------
+def test_seeker_export_includes_ai_test_log(app, tmp_path):
+    """구직자 화면 [테스트 결과 내보내기]: AI 호출 기록(ailog)·구직자·지원이 한 파일로, 키 값은 없음"""
+    pg = app
+    seeker_apply(pg, example="P-01")
+    log = stored(pg, "ailog")
+    assert len(log) == 1 and log[0]["kind"] == "이력 정리·공고 추천" and log[0]["example_id"] == "P-01"
+    assert log[0]["ms"] >= 0 and log[0]["result"]["jobs"] and log[0]["ai_used"] is False  # 테스트 서버는 키 없음
+    pg.wait_for_function("document.querySelector('#myDocs').textContent.includes('지원 현황 1건')")  # 새로고침 없이 반영
+    assert "서버를 끄면 테스트 결과가 사라져요" in pg.inner_text("#myDocs")
+    with pg.expect_download() as dl:
+        pg.click("#myDocs #mdExport")
+    path = tmp_path / "out.json"; dl.value.save_as(path)
+    assert dl.value.suggested_filename.startswith("ieum24-test-no-ai-")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert len(data["seekers"]) == 1 and len(data["applications"]) == 1 and len(data["ailog"]) == 1
+    assert data["ai"]["provider"] == "not_configured" and "API_KEY" not in path.read_text(encoding="utf-8")
+    goto_companies(pg)  # 기업 화면 내보내기도 같은 내용
+    pg.wait_for_function("document.querySelector('#storeStats').textContent.includes('AI 테스트 기록 1건')")
+    with pg.expect_download() as dl2:
+        pg.click("#storeExport")
+    assert dl2.value.suggested_filename.startswith("ieum24-test-")
+    assert not pg.errors, pg.errors
+
+
+def test_team_results_merge_on_leader_browser(browser, tmp_path):
+    """팀원 2명이 각자 컴퓨터(서버)에서 테스트 → 내보내기 → 팀장 브라우저에서 두 파일 불러오기 → 기업 화면에서 이어서 채용"""
+    files, jids = [], []
+    for who, ex in (("A", "P-01"), ("B", "P-S01")):
+        proc, base = _server()  # 팀원마다 다른 개발 서버(메모리 저장) = 다른 컴퓨터
+        try:
+            pg = _page(browser, base)
+            jids.append(seeker_apply(pg, example=ex, alias=f"팀원{who}구직"))
+            pg.wait_for_selector("#myDocs #mdExport")
+            with pg.expect_download() as dl:
+                pg.click("#myDocs #mdExport")
+            path = tmp_path / f"export_{who}.json"; dl.value.save_as(path); files.append(str(path))
+            pg.context.close()
+        finally:
+            proc.kill()
+    proc, base = _server({"VERCEL": "1"})  # 팀장: 배포 환경과 같은 브라우저 저장
+    try:
+        pg = _page(browser, base)
+        goto_companies(pg)
+        bad = tmp_path / "broken.json"; bad.write_text("{ 깨진", encoding="utf-8")
+        with pg.expect_file_chooser() as fc:
+            pg.click("#storeImport")
+        fc.value.set_files(files + [str(bad)])
+        pg.wait_for_function("document.querySelector('#toast').textContent.includes('export_B.json')")
+        toast = pg.inner_text("#toast")
+        assert "export_A.json: 구직자 1 · 지원 1 · AI 기록 1" in toast and "broken.json: 불러오지 못함" in toast
+        pg.wait_for_function("document.querySelector('#storeStats').textContent.includes('지원 2건')")
+        assert "AI 테스트 기록 2건" in pg.inner_text("#storeStats")
+        seekers = stored(pg, "seekers")
+        assert sorted(s["alias"] for s in seekers) == ["팀원A구직", "팀원B구직"]
+        assert {s["imported_from"] for s in seekers} == {"export_A.json", "export_B.json"}  # 누구 결과인지 구분
+        # 같은 파일을 다시 불러와도 늘어나지 않음(덮어쓰기)
+        with pg.expect_file_chooser() as fc:
+            pg.click("#storeImport")
+        fc.value.set_files(files[:1])
+        pg.wait_for_timeout(500)
+        assert len(stored(pg, "seekers")) == 2 and len(stored(pg, "applications")) == 2
+        # 팀원 A가 지원한 회사에서 팀원 구직자가 지원자로 보이고, 채용 확정까지 이어짐
+        open_company(pg, company_key_for(pg, jids[0])); hire_stored(pg)
+        assert "팀원A구직" in pg.inner_text("#ctDoc")
+        assert not pg.errors, pg.errors
+        pg.context.close()
+    finally:
+        proc.kill()
+
+
+
+# ---------- 2026-10-17: 서명 변경 ----------
+def test_change_worker_and_employer_signature_after_save(app):
+    """저장한 계약서에서 근로자 서명·사업주 서명(날인)을 각각 바꾸고, 이력이 남고, 법인 인장으로 되돌릴 수 있음"""
+    pg = app
+    jid = seeker_apply(pg)
+    open_company(pg, company_key_for(pg, jid)); hire_stored(pg)
+    assert pg.locator("#ctSignBtns [data-resign=worker]").count() == 0  # 서명 전에는 '변경' 없음
+    draw_sign(pg); save_contract(pg)
+    first = stored(pg, "contracts")[0]["worker_sign"]
+    # 근로자 서명 변경 → 인장으로 (계약 내용 그대로면 바로 저장)
+    pg.click("#ctSignBtns [data-resign=worker]")
+    pg.click("dialog.sign-dlg [data-tab=seal]"); pg.click("dialog.sign-dlg [data-fake]"); pg.click("dialog.sign-dlg [data-ok]")
+    pg.wait_for_function("document.querySelector('#toast').textContent.includes('근로자 서명을(를) 바꿔 저장')")
+    ct = stored(pg, "contracts")[0]
+    assert ct["worker_sign"] != first and ct["sign_kind"] == "인장" and ct["status"] == "체결 완료"
+    # 사업주 서명 변경 (서명 창 제목이 사업주)
+    pg.click("#ctSignBtns [data-resign=employer]")
+    assert "사업주 서명" in pg.inner_text("dialog.sign-dlg h3")
+    box = pg.locator(".sign-pad").bounding_box()
+    pg.mouse.move(box["x"] + 30, box["y"] + 60); pg.mouse.down(); pg.mouse.move(box["x"] + 200, box["y"] + 120); pg.mouse.up()
+    pg.click("dialog.sign-dlg [data-ok]")
+    pg.wait_for_function("document.querySelector('#toast').textContent.includes('사업주 서명·날인을(를) 바꿔 저장')")
+    ct = stored(pg, "contracts")[0]
+    assert ct["employer_sign"] and ct["seal"] == ct["employer_sign"] and ct["employer_kind"] == "서명"
+    assert [l["who"] for l in ct["sign_log"]] == ["근로자", "근로자", "사업주"]
+    # 법인 인장으로 되돌리기
+    pg.click("#ctSignBtns [data-resign=seal]")
+    pg.wait_for_function("document.querySelector('#toast').textContent.includes('사업주 날인')")
+    ct = stored(pg, "contracts")[0]
+    assert not ct["employer_sign"] and ct["seal"] and ct["seal"] != first and len(ct["sign_log"]) == 4
+    # 계약 내용도 고친 상태면 바로 저장하지 않고 다시 저장 안내
+    pg.fill('[data-f="job"]', "웹 개발 — 화면 개발")
+    pg.wait_for_selector("#ctDoc [data-sign]")  # 내용이 바뀌어 근로자 서명 초기화
+    pg.click("#ctSignBtns [data-resign=employer]")
+    pg.click("dialog.sign-dlg [data-tab=seal]"); pg.click("dialog.sign-dlg [data-fake]"); pg.click("dialog.sign-dlg [data-ok]")
+    pg.wait_for_function("document.querySelector('#toast').textContent.includes('계약서 다시 저장')")
+    assert not stored(pg, "contracts")[0]["employer_sign"]  # 아직 저장 안 됨
+    # 담당자 화면 계약서 보기에 서명 이력
+    pg.evaluate("async () => IeumFlow.viewContract((await IeumStore.list('contracts'))[0].id)")
+    pg.wait_for_selector("dialog.doc-dlg >> text=서명 이력")
+    assert "사업주 서명·날인 변경" in pg.inner_text("dialog.doc-dlg") and "법인 인장으로 되돌림" in pg.inner_text("dialog.doc-dlg")
+    assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 군필자 청년 연령 연동 ----------
+def test_military_extension_example_and_manual_input(app):
+    pg = app
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    assert pg.is_hidden("#milWrap")  # 기본은 '만 15~34세' 체크 → 군필 입력 숨김
+    pg.select_option("#seekExample", "P-S02")  # 만 36세 · 육군 18개월 · 청년도전 수료
+    assert not pg.is_checked("#youth") and pg.is_visible("#milWrap") and pg.is_checked("#mil")
+    assert pg.input_value("#mil_age") == "36" and pg.input_value("#mil_months") == "18"
+    pg.check("#seekForm [name=agree_privacy]"); pg.check("#seekForm [name=consent]")
+    pg.click("#seekBtn"); pg.wait_for_selector("#seekResult .apply", timeout=30000)
+    assert "군 복무기간 연동" in pg.inner_text("#seekResult")
+    # 직접 입력: 개월 수를 비우면 필수값 안내, 청년 체크하면 군필 입력 숨김
+    pg.fill("#mil_months", ""); pg.click("#seekBtn")
+    assert "의무복무 기간" in pg.inner_text("#seekMsg")
+    pg.check("#youth"); assert pg.is_hidden("#milWrap") and not pg.is_checked("#mil")
     assert not pg.errors, pg.errors
