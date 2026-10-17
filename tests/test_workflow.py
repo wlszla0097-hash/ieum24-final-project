@@ -247,3 +247,19 @@ def test_case_eligibility_uses_hire_date():
     case = cases.build_case(parse_posting(POST), {**cases.resolve_applicant({**parse_posting(POST), "id": "U-t"}, "U-t-Sx", None, {"alias": "가", "profile": SEEK}), "programs": dojeon["programs"]},
                             date(2026, 4, 1), today=date(2026, 10, 17))
     assert case["evidence"]["title"] == "취업애로청년 근거 미확인" and any("채용일" in l for l in case["evidence"]["lines"])
+
+
+def test_swapped_reading_is_corrected_and_corp_jamo_slip():
+    """실측: 윤하람 건에서 보낸 분=윤하람·받는 분=김대표로 뒤바뀜, 회사명 '다운몬류' → 바로잡고 표시"""
+    from claimdocs import check_month
+    ps = {"name": "윤하람", "ym": "2026-04", "gross": "2300000", "net": "2030970"}
+    ctx = {"worker": "윤하람", "company": "다온물류 (가상)"}
+    r = check_month("2026-04", ps, {"recipient": "김대표", "sender": "윤하람", "amount": "2030970"}, ctx)
+    lv = {i["item"]: i["level"] for i in r["items"]}
+    assert lv["성명"] == "일치" and lv["이체자(보내는 분)"] == "확인 필요" and lv["판독 보정"] == "참고" and r["level"] == "확인 필요"
+    ok = check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몬류 (가상)", "amount": "2030970"}, ctx)
+    assert ok["level"] == "일치"
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    out = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": ctx, "issued_payslip": {**ps, "pay_date": "2026-05-10", "deduction": "0"},
+                                "sample_truth": {"transfer": {"recipient": "김대표", "sender": "윤하람", "amount": "2030970", "date": "2026-05-10"}}})
+    assert out["transfer"]["sender"] == "김대표" and out["transfer"]["recipient"] == "윤하람"  # 화면 비교표도 바로잡힌 값

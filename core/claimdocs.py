@@ -50,6 +50,35 @@ def _vowel_slip(a: str, b: str) -> bool:
     return len(a) == len(b) and a != b and all(x == y or (_skeleton(x) == _skeleton(y) and isinstance(_skeleton(x), tuple)) for x, y in zip(a, b))
 
 
+CHO, JUNG, JONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ", " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+
+
+def _jamo(s: str) -> str:
+    out = []
+    for ch in s:
+        c = ord(ch) - 0xAC00
+        out.append(CHO[c // 588] + JUNG[(c % 588) // 28] + JONG[c % 28].strip() if 0 <= c < 11172 else ch)
+    return "".join(out)
+
+
+def _dist(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i]
+        for j, y in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y)))
+        prev = cur
+    return prev[-1]
+
+
+def _corp_slip(a: str, b: str) -> bool:
+    """회사명 판독 오차: 같은 글자 수에서 자모 차이가 30% 이내(다온물류→다운몬류). 다온유통처럼 다른 회사는 걸러진다."""
+    if len(a) != len(b) or len(b) < 3:
+        return False
+    ja, jb = _jamo(a), _jamo(b)
+    return _dist(ja, jb) <= max(1, int(len(jb) * 0.3))
+
+
 def _name_slip(a: str, b: str) -> bool:
     """사람 이름: 성(첫 글자)은 같고 이름 쪽 한 글자만 다름. 성이 다르면(김가람↔박가람) 다른 사람으로 본다."""
     return (_one_off(a, b) or _vowel_slip(a, b)) and a[:1] == b[:1]
@@ -74,6 +103,14 @@ def months_between(start_ym: str, end_ym: str) -> list[str]:
     return out
 
 
+def fix_swap(transfer: dict, worker) -> tuple[dict, bool]:
+    """급여 이체에서 근로자가 '보내는 분'일 수 없다 → AI가 보낸 분·받는 분을 바꿔 읽은 것으로 보고 바로잡는다."""
+    w = _name(worker)
+    if w and _name(transfer.get("sender")) == w and _name(transfer.get("recipient")) not in ("", w):
+        return {**transfer, "sender": transfer.get("recipient"), "recipient": transfer.get("sender")}, True
+    return transfer, False
+
+
 def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
     """한 달 서류 점검. ctx: {worker, hire_date, weekly_hours, history: [{ym, gross}] (이전 달까지 첨부분)}"""
     items = []
@@ -82,6 +119,8 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
         items.append({"level": level, "item": item, "detail": detail, "basis": basis})
 
     worker = _name(ctx.get("worker"))
+    transfer, swapped = fix_swap(transfer, ctx.get("worker"))
+    swapped = swapped or bool(ctx.get("swapped"))
     p_name, t_name = _name(payslip.get("name")), _name(transfer.get("recipient"))
     names = [n for n in (p_name, t_name) if n]
     if not names:
@@ -95,6 +134,8 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
     else:
         add(MATCH, "성명", f"{payslip.get('name') or transfer.get('recipient')} — 명세서·이체확인증 일치")
 
+    if swapped:
+        add("참고", "판독 보정", "AI 판독에서 보내는 분·받는 분이 바뀐 것으로 보여 바로잡음 — 원본 확인", "이음24 판독 보정")
     company = _corp(ctx.get("company"))
     if company:  # 이체자(보내는 분) = 사업주(회사) 명의인지 — 회사명을 알 때만 점검
         sender = _corp(transfer.get("sender"))
@@ -102,7 +143,7 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
             add(CHECK, "이체자(보내는 분)", "이체확인증에서 보내는 분을 읽지 못함 — 원본 확인")
         elif company in sender or sender in company:
             add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 사업주(회사) 명의 계좌에서 이체")
-        elif len(company) >= 3 and (_one_off(sender, company) or _vowel_slip(sender, company)):  # 회사명 판독 오차는 같은 회사로 보고 표시만 남김
+        elif len(company) >= 3 and (_one_off(sender, company) or _vowel_slip(sender, company) or _corp_slip(sender, company)):  # 회사명 판독 오차는 같은 회사로 보고 표시만 남김
             add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 회사 {ctx.get('company')}와 글자 일부 차이(판독 오차로 보고 일치 처리, 원본 확인 권장)")
         else:
             add(CHECK, "이체자(보내는 분)", f"보내는 분 {transfer.get('sender')} ≠ 회사 {ctx.get('company')} — 대표자 개인 계좌 등 사업주 명의가 아닌 지급인지 확인")
