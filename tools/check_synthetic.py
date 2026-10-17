@@ -157,12 +157,15 @@ else:
                 id_owner[sid] = name
             if tag and sid and not str(sid).startswith(f"P-{tag}"):
                 warn(f"{w}: {name} 의 id는 'P-{tag}01' 처럼 P-{tag} 로 시작하기로 함 → '{sid}'")
+            mm = s.get("military_months")
+            if mm is not None and not (isinstance(mm, int) and 0 <= mm <= 72):
+                err(f"{w}: military_months(의무복무 개월)는 0~72 숫자")
             for pr in s.get("programs") or []:
                 if pr.get("type") not in ("국민취업지원제도", "청년도전지원사업"):
                     err(f"{w}: programs.type 은 '국민취업지원제도' 또는 '청년도전지원사업'")
             try:
                 j = judge(s, ref, True)
-                print(f"   · {s.get('alias')} ({s.get('age')}세) → 수도권 정규직 공고 기준 배지 {'대상' if j['eligible'] else '비대상'}"
+                print(f"   · {s.get('alias')} ({s.get('age')}세{f', 군 복무 {mm}개월' if mm else ''}) → 수도권 정규직 공고 기준 배지 {'대상' if j['eligible'] else '비대상'}"
                       + (f" ({j.get('reason')})" if j.get("reason") else ""))
             except Exception as e:  # noqa: BLE001
                 err(f"{w}: 배지 판단 중 오류 — {e!r}")

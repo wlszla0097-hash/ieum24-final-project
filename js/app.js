@@ -87,7 +87,7 @@ $$("textarea[maxlength]").forEach((ta) => ta.addEventListener("input", () => {
 
 const fmt = (n) => (n || n === 0 ? Number(n).toLocaleString("ko-KR") : "");
 /* ---------- 3. 구직자: 직접 쓴 경험 → AI 정리·역량 문장·공고 추천 ---------- */
-const SEEK_FIELDS = ["alias", "kuchwi", "kuchwi_qualified", "kuchwi_iap", "kuchwi_job_after", "dojeon", "dojeon_completed", "youth", "experience", "job", "region",
+const SEEK_FIELDS = ["alias", "kuchwi", "kuchwi_qualified", "kuchwi_iap", "kuchwi_job_after", "dojeon", "dojeon_completed", "youth", "mil", "mil_age", "mil_months", "experience", "job", "region",
   "consent", "agree_privacy", "agree_ai", "agree_detail", "agree_cert"];
 const CONSENT_VERSION = "2026-10-10-v1";
 const seekEl = (k) => $(`#seekForm [name="${k}"]`);
@@ -148,9 +148,11 @@ function fillForm(root, values, names) {
   });
 }
 function syncProgramBoxes() {
+  $("#milWrap").hidden = $("#youth").checked;  // 만 15~34세가 아닐 때만 군필 연령 연동 확인
+  if ($("#milWrap").hidden) $("#mil").checked = false;  // 청년(15~34)에 체크하면 군필 연동 입력은 쓰지 않음
   $$(".sub[data-for]").forEach((s) => (s.hidden = !$("#" + s.dataset.for).checked));
 }
-["kuchwi", "dojeon"].forEach((id) => $("#" + id).addEventListener("change", syncProgramBoxes));
+["kuchwi", "dojeon", "youth", "mil"].forEach((id) => $("#" + id).addEventListener("change", syncProgramBoxes));
 
 async function loadSeekExamples() {
   if (state.seekExamples.length) return;
@@ -177,6 +179,7 @@ $("#seekForm").addEventListener("submit", async (e) => {
   const need = [["experience", "내 경험"], ["job", "희망 직무"]];
   if (body.kuchwi) need.push(["kuchwi_qualified", "국민취업지원제도 수급자격 인정일"]);
   if (body.dojeon) need.push(["dojeon_completed", "청년도전지원사업 수료일"]);
+  if (!body.youth && body.mil) need.push(["mil_age", "만 나이"], ["mil_months", "의무복무 기간(개월)"]);
   const missing = need.filter(([k]) => !body[k]);
   missing.forEach(([k]) => seekEl(k).classList.add("invalid"));
   if (missing.length) return showMsg(msg, `필수값을 입력하세요: ${missing.map(([, l]) => l).join(", ")}`);

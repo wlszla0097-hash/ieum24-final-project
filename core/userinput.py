@@ -57,7 +57,8 @@ def parse_cert(c, form: dict, today: date) -> dict | None:
 
 
 def parse_seeker(b: dict, today: date | None = None) -> dict:
-    """구직자 입력 → person(dict). 연령은 '청년 여부'만 받고 숫자 나이는 받지 않는다."""
+    """구직자 입력 → person(dict). 연령은 '청년 여부'만 받고 숫자 나이는 받지 않는다.
+    예외: 만 35~39세 군필자는 군 복무기간 연동 확인을 위해 만 나이와 의무복무 개월 수만 받는다(기업에는 표시하지 않음)."""
     today = today or date.today()
     if not isinstance(b, dict):
         raise ApiError(400, "bad_json", "요청 형식이 올바르지 않습니다.")
@@ -85,8 +86,18 @@ def parse_seeker(b: dict, today: date | None = None) -> dict:
     if b.get("dojeon"):
         programs.append({"type": "청년도전지원사업", "completed": _date(b.get("dojeon_completed"), "청년도전지원사업 수료일", today), "status": "수료"})
     youth = bool(b.get("youth"))
+    mil_age = mil_months = None
+    if not youth and b.get("mil"):
+        mil_age, mil_months = num(b.get("mil_age")), num(b.get("mil_months"))
+        if mil_age is None or not 35 <= mil_age <= 39:
+            raise ApiError(400, "invalid_input", "군필 연령 연동은 만 35~39세만 해당돼요. 만 나이를 선택하세요.")
+        if mil_months is None or not 1 <= mil_months <= 72:
+            raise ApiError(400, "invalid_input", "의무복무 기간을 개월 수(1~72)로 입력하세요. 예: 육군 18개월")
+        mil_age, mil_months = int(mil_age), int(mil_months)
     points = [text(x, 160) for x in (b.get("points") or [])[:8] if text(x, 160)] if isinstance(b.get("points"), list) else []
-    return {"id": "ME", "alias": text(b.get("alias"), 10) or "나", "youth": youth, "age": 25 if youth else 40,  # age는 규칙 계산용 대표값
+    return {"id": "ME", "alias": text(b.get("alias"), 10) or "나", "youth": youth,
+            "age": 25 if youth else (mil_age or 40),  # age는 규칙 계산용 대표값 (군필 연동 확인 때만 실제 만 나이)
+            "military_months": mil_months or 0,
             "programs": programs, "insurance": insurance, "experience": exp, "extra": "",
             "desire": {"job": job, "region": region},
             "consent": bool(b.get("consent")),                 # [선택] 지원제도 활용 가능 표시 공개
@@ -163,7 +174,9 @@ def posting_to_form(post: dict) -> dict:
 
 def persona_to_form(p: dict) -> dict:
     """합성 인물 → 입력 폼 예시값 (예시 불러오기 버튼용)."""
+    mil = 35 <= p["age"] <= 39 and (p.get("military_months") or 0) > 0
     f = {"alias": p["alias"], "youth": 15 <= p["age"] <= 34, "job": p["desire"]["job"], "region": p["desire"]["region"],
+         "mil": mil, "mil_age": str(p["age"]) if mil else "", "mil_months": str(p["military_months"]) if mil else "",
          "experience": "\n".join(f"- {a['name']}" + (f" ({a['hours']}시간)" if a.get("hours") else "") + f", {a['done'][:7]}" for a in p["activities"]),
          "kuchwi": False, "dojeon": False}
     for g in p["programs"]:

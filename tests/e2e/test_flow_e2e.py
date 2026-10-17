@@ -566,3 +566,22 @@ def test_change_worker_and_employer_signature_after_save(app):
     pg.wait_for_selector("dialog.doc-dlg >> text=서명 이력")
     assert "사업주 서명·날인 변경" in pg.inner_text("dialog.doc-dlg") and "법인 인장으로 되돌림" in pg.inner_text("dialog.doc-dlg")
     assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 군필자 청년 연령 연동 ----------
+def test_military_extension_example_and_manual_input(app):
+    pg = app
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    assert pg.is_hidden("#milWrap")  # 기본은 '만 15~34세' 체크 → 군필 입력 숨김
+    pg.select_option("#seekExample", "P-S02")  # 만 36세 · 육군 18개월 · 청년도전 수료
+    assert not pg.is_checked("#youth") and pg.is_visible("#milWrap") and pg.is_checked("#mil")
+    assert pg.input_value("#mil_age") == "36" and pg.input_value("#mil_months") == "18"
+    pg.check("#seekForm [name=agree_privacy]"); pg.check("#seekForm [name=consent]")
+    pg.click("#seekBtn"); pg.wait_for_selector("#seekResult .apply", timeout=30000)
+    assert "군 복무기간 연동" in pg.inner_text("#seekResult")
+    # 직접 입력: 개월 수를 비우면 필수값 안내, 청년 체크하면 군필 입력 숨김
+    pg.fill("#mil_months", ""); pg.click("#seekBtn")
+    assert "의무복무 기간" in pg.inner_text("#seekMsg")
+    pg.check("#youth"); assert pg.is_hidden("#milWrap") and not pg.is_checked("#mil")
+    assert not pg.errors, pg.errors

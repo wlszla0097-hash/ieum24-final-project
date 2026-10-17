@@ -30,8 +30,22 @@ def is_capital(region: str | None) -> bool | None:
     return str(region).strip().startswith(CAPITAL)
 
 
-def is_youth(age) -> bool:
-    return isinstance(age, int) and 15 <= age <= 34
+YOUTH_MAX, YOUTH_MAX_MIL = 34, 39  # 청년 만 15~34세, 군필자는 의무복무기간만큼 연동해 최고 만 39세 (2026 지침·사업 공고)
+MIL_NOTE = "군 복무기간 연동 — 생년월일·전역일 기준 최종 확인은 고용센터"
+
+
+def mil_youth(age, months) -> bool:
+    """군필자 연령 연동: 만 나이에서 의무복무기간을 뺀 나이가 만 34세 이하(만 35세 미만)이면 청년. 최고 만 39세.
+    나이를 '만 N세' 정수로만 받으므로 N세 0개월로 계산한다(생일에 따라 경계는 고용센터 확인)."""
+    if not (isinstance(age, int) and isinstance(months, int)) or months <= 0 or not (YOUTH_MAX < age <= YOUTH_MAX_MIL):
+        return False
+    return age * 12 - months < (YOUTH_MAX + 1) * 12
+
+
+def is_youth(age, military_months: int = 0) -> bool:
+    if not isinstance(age, int):
+        return False
+    return 15 <= age <= YOUTH_MAX or mil_youth(age, military_months)
 
 
 def history_flags(person: dict, before: date | None = None) -> dict:
@@ -63,7 +77,8 @@ def judge(person: dict, post: dict, consent: bool) -> dict:
     """지원자 1명 × 공고 1건에 대한 배지 판단. seeker_text 는 본인에게만, employer 에는 badge 여부만 보낸다."""
     cap = is_capital(post.get("region"))
     flags = history_flags(person)
-    youth = is_youth(person.get("age"))
+    youth = is_youth(person.get("age"), person.get("military_months") or 0)
+    mil = youth and mil_youth(person.get("age"), person.get("military_months") or 0)
     base = {"badge": False, "eligible": False, "basis": GUIDE_YOUTH, "flags": flags}
     if post.get("emp_type") not in (None, "정규직"):
         return {**base, "type": "not_regular", "seeker_text": "정규직 공고가 아니라서 채용지원금 연계 대상이 아니에요."}
@@ -87,8 +102,9 @@ def judge(person: dict, post: dict, consent: bool) -> dict:
                 "seeker_text": f"수도권 기업 유형의 취업애로청년 근거가 이력에서 확인되지 않아 표시하지 않아요 ({why}). 다른 요건 해당 여부는 고용센터에서 확인할 수 있어요."}
     kind = "국민취업지원제도 참여 후 최초 취업" if flags["kuchwi_first_job"] else "청년도전지원사업 수료"
     text = (f"이 기업이 나를 정규직으로 채용하면 '{kind}' 근거로 기업이 청년일자리도약장려금을 활용할 수 있을 것으로 예상돼요."
+            + (f" (청년 연령은 {MIL_NOTE})" if mil else "")
             + ("" if consent else " 지금은 동의하지 않아 기업 화면에 표시되지 않아요."))
-    return {**base, "type": "capital_eligible", "eligible": True, "badge": bool(consent), "reason": kind, "seeker_text": text}
+    return {**base, "type": "capital_eligible", "eligible": True, "badge": bool(consent), "reason": kind + (" · 군필 연령 연동" if mil else ""), "seeker_text": text}
 
 
 def posting_check(post: dict) -> dict:
