@@ -28,8 +28,9 @@ function synthPay(gross, ym) {
 }
 
 /** 합성 급여명세서·이체확인증 그림 (JPEG base64) */
+const K = 2;  // 합성 서류 2배 해상도 (AI 판독 선명도)
 function drawPayslip(c) {
-  const cv = document.createElement("canvas"); cv.width = 620; cv.height = 760; const g = cv.getContext("2d");
+  const cv = document.createElement("canvas"); cv.width = 620 * K; cv.height = 760 * K; const g = cv.getContext("2d"); g.scale(K, K);
   g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
   g.fillStyle = "#111"; g.textBaseline = "top";
   const F = (sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic",sans-serif`);
@@ -51,7 +52,7 @@ function drawPayslip(c) {
   return cv.toDataURL("image/jpeg", 0.85);
 }
 function drawTransfer(c) {
-  const cv = document.createElement("canvas"); cv.width = 620; cv.height = 400; const g = cv.getContext("2d");
+  const cv = document.createElement("canvas"); cv.width = 620 * K; cv.height = 400 * K; const g = cv.getContext("2d"); g.scale(K, K);
   g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = "#0b3d91"; g.fillRect(0, 0, 620, 64);
   g.textBaseline = "top"; const F = (sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic",sans-serif`);
   g.fillStyle = "#fff"; F(24, 1); g.fillText("이체확인증", 30, 18);

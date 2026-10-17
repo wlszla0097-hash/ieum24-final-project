@@ -1,0 +1,20 @@
+[
+ {
+  "file": "cert_dojeon.png",
+  "expect_program": "청년도전지원사업",
+  "expect_date": "2026-05-29",
+  "doc": "수료증"
+ },
+ {
+  "file": "cert_kuchwi.png",
+  "expect_program": "국민취업지원제도",
+  "expect_date": "2026-04-20",
+  "doc": "국민취업지원제도참여확인서"
+ },
+ {
+  "file": "cert_training.png",
+  "expect_program": "기타",
+  "expect_date": "2026-09-12",
+  "doc": "수료증"
+ }
+]

@@ -585,3 +585,19 @@ def test_military_extension_example_and_manual_input(app):
     assert "의무복무 기간" in pg.inner_text("#seekMsg")
     pg.check("#youth"); assert pg.is_hidden("#milWrap") and not pg.is_checked("#mil")
     assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 구직자 증빙 예시 서류 ----------
+def test_seeker_cert_sample_fills_program_date(app):
+    pg = app
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.check("#seekForm [name=agree_cert]")
+    pg.select_option("#certSample", "kuchwi")
+    assert "첨부했어요" in pg.inner_text("#certSampleName")
+    pg.click("#certBtn"); pg.wait_for_selector("#certResult .cert-read", timeout=20000)
+    assert "국민취업지원제도" in pg.inner_text("#certResult") and pg.is_checked("#kuchwi")
+    assert pg.input_value("#kuchwi_qualified") == "2026-04-20"  # 발급일(10/17)이 아니라 수급자격 인정일
+    pg.select_option("#certSample", "training"); pg.click("#certBtn")
+    pg.wait_for_function("document.querySelector('#certResult').textContent.includes('확인되지 않았어요')", timeout=20000)
+    assert not pg.errors, pg.errors

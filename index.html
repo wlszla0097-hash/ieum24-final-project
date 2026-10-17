@@ -115,6 +115,9 @@
                 <dt>보유 기간</dt><dd>파일과 판독 결과를 서버에 저장하지 않습니다.</dd></dl></details>
               <div class="cert-row"><input type="file" id="certFile" accept="image/png,image/jpeg,image/webp,application/pdf" aria-label="증빙 파일 선택">
                 <button class="btn ghost" id="certBtn" type="button">AI로 읽기</button></div>
+              <div class="cert-row"><select id="certSample" aria-label="예시 증빙 서류"><option value="">시연: 예시 서류 넣기…</option>
+                <option value="dojeon">청년도전지원사업 수료증 (가상)</option><option value="kuchwi">국민취업지원제도 참여 확인서 (가상)</option>
+                <option value="training">일반 직업훈련 수료증 (가상 — '기타'로 읽혀야 정상)</option></select><span class="muted" id="certSampleName"></span></div>
               <div id="certResult"></div>
             </div>
             <label class="check"><input type="checkbox" id="youth" name="youth" checked> 만 15~34세 청년입니다 <small class="muted">(나이는 저장·전송하지 않고 해당 여부만 사용)</small></label>

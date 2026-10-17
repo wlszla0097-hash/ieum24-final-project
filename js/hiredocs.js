@@ -15,7 +15,8 @@ const b64 = (u) => u.split(",")[1];
 const S = { ctx: null, files: {}, truth: null, res: null, onDone: null };
 
 const FONT = (g, sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic",sans-serif`);
-const paper = (w, h) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.fillStyle = "#111"; g.textBaseline = "top"; return [cv, g]; };
+const paper = (w, h) => { const k = (window.IeumContract && window.IeumContract.DOC_SCALE) || 2;  // 2배 해상도 (AI 판독 선명도)
+  const cv = document.createElement("canvas"); cv.width = w * k; cv.height = h * k; const g = cv.getContext("2d"); g.scale(k, k); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.fillStyle = "#111"; g.textBaseline = "top"; return [cv, g]; };
 
 /** 표준근로계약서(기간의 정함이 없는 경우) 항목 배치를 따른 합성 그림 */
 function drawContract(c) {

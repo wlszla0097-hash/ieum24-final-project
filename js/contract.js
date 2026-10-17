@@ -209,8 +209,10 @@ function payslipHtml(p) {
 /* ---------- 시연용 은행 이체확인증 (가상 은행 — 실제 은행 양식·상호 아님) ---------- */
 const BANKS = ["가람은행", "누리은행", "솔빛은행"];
 /** c: {bank, date, sender, recipient, amount, memo} → JPEG dataURL */
+/** 합성 서류 이미지 배율 — AI 판독용 글씨 선명도 (2배: 15px 글자가 30px로 그려짐) */
+const DOC_SCALE = 2;
 function drawBankTransfer(c) {
-  const cv = document.createElement("canvas"); cv.width = 640; cv.height = 560; const g = cv.getContext("2d");
+  const cv = document.createElement("canvas"); cv.width = 640 * DOC_SCALE; cv.height = 560 * DOC_SCALE; const g = cv.getContext("2d"); g.scale(DOC_SCALE, DOC_SCALE);
   const F = (sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif`);
   const bank = `${c.bank || BANKS[0]}(가상)`;
   g.fillStyle = "#fff"; g.fillRect(0, 0, 640, 560);
@@ -236,6 +238,45 @@ function drawBankTransfer(c) {
   return cv.toDataURL("image/jpeg", 0.9);
 }
 
+/** 구직자 증빙 서류 예시 (수료증·참여확인서) — 일반 양식의 항목 배치만 따르고 내용은 가상.
+ *  c: {kind: "dojeon"|"kuchwi"|"training", name, title, rows: [[항목, 값]], body, issuer, date(YYYY-MM-DD)} */
+const CERT_SAMPLES = {
+  dojeon: { kind: "dojeon", title: "수 료 증", no: "제 2026-0517 호", name: "정다온(가상)",
+    rows: [["사업명", "청년도전지원사업"], ["과정명", "단기 프로그램 (진로 탐색·역량 강화)"], ["참여기간", "2026. 3. 2. ~ 2026. 5. 29."], ["수료일", "2026. 5. 29."]],
+    body: "위 사람은 청년도전지원사업 단기 프로그램의 소정 과정을 마쳤으므로 이 증서를 드립니다.", issuer: "누리청년센터(가상) 센터장", date: "2026-05-29",
+    truth: { program: "청년도전지원사업", date: "2026-05-29" } },
+  kuchwi: { kind: "kuchwi", title: "국민취업지원제도 참여 확인서", no: "제 2026-04-1182 호", name: "서지우(가상)",
+    rows: [["사업명", "국민취업지원제도"], ["참여 유형", "I유형"], ["수급자격 인정일", "2026. 4. 20."], ["취업활동계획 수립일", "2026. 5. 2."], ["참여 상태", "참여 중"]],
+    body: "위 사람이 국민취업지원제도에 참여하고 있음을 확인합니다.", issuer: "가람고용센터(가상) 소장", date: "2026-10-17",
+    truth: { program: "국민취업지원제도", date: "2026-04-20" } },
+  training: { kind: "training", title: "수 료 증", no: "제 2026-0912-07 호", name: "한도윤(가상)",
+    rows: [["과정명", "웹 프론트엔드 개발자 양성과정"], ["훈련시간", "480시간"], ["훈련기간", "2026. 5. 11. ~ 2026. 9. 12."], ["수료일", "2026. 9. 12."]],
+    body: "위 사람은 위 직업능력개발훈련 과정을 수료하였기에 이 증서를 수여합니다.", issuer: "솔빛IT아카데미(가상) 원장", date: "2026-09-12",
+    truth: { program: "기타", date: "2026-09-12" } },
+};
+function drawCertificate(c) {
+  const W = 620, H = 880, cv = document.createElement("canvas"); cv.width = W * DOC_SCALE; cv.height = H * DOC_SCALE; const g = cv.getContext("2d"); g.scale(DOC_SCALE, DOC_SCALE);
+  const F = (sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Serif KR","Batang","Nanum Myeongjo","Noto Sans KR",serif`);
+  g.fillStyle = "#fffdf6"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#8a6d3b"; g.lineWidth = 6; g.strokeRect(20, 20, W - 40, H - 40); g.lineWidth = 1.5; g.strokeRect(32, 32, W - 64, H - 64);
+  g.fillStyle = "#333"; g.textBaseline = "middle"; F(14); g.fillText(c.no, 60, 72);
+  g.textAlign = "center"; F(c.title.length > 8 ? 30 : 40, 1); g.fillStyle = "#111"; g.fillText(c.title, W / 2, 140);
+  g.textAlign = "left"; F(18); g.fillText(`성        명 :  ${c.name}`, 90, 220); g.fillText("생년월일 :  ****. **. **.", 90, 256);
+  c.rows.forEach(([k, v], i) => { const y = 310 + i * 44; F(17); g.fillStyle = "#555"; g.fillText(k, 90, y); F(18, k === "사업명" || k.includes("일")); g.fillStyle = "#111"; g.fillText(v, 270, y); });
+  const by = 330 + c.rows.length * 44; F(18); g.fillStyle = "#222";
+  const words = c.body.split(" "); let line = "", y = by + 20;
+  words.forEach((w) => { if (g.measureText(line + w).width > W - 180) { g.fillText(line, 90, y); line = ""; y += 32; } line += w + " "; });
+  g.fillText(line, 90, y);
+  const [yy, mm, dd] = c.date.split("-").map(Number);
+  g.textAlign = "center"; F(20); g.fillText(`${yy}년 ${mm}월 ${dd}일`, W / 2, H - 200);
+  F(24, 1); g.fillText(c.issuer, W / 2 - 20, H - 140);
+  g.strokeStyle = "rgba(200,30,30,.85)"; g.lineWidth = 3; g.strokeRect(W / 2 + 150, H - 172, 64, 64);
+  g.fillStyle = "rgba(200,30,30,.85)"; F(13, 1); const st = c.issuer.replace(/\(가상\).*/, "").slice(0, 4);
+  g.fillText(st.slice(0, 2), W / 2 + 182, H - 152); g.fillText(st.slice(2) + "인", W / 2 + 182, H - 130);
+  g.fillStyle = "#999"; F(11); g.fillText("합성 데이터 시연용 — 실제 기관·인물 아님", W / 2, H - 56); g.textAlign = "left";
+  return cv.toDataURL("image/png");
+}
+
 /** 문서 보기 창 (담당자·근로자 화면 공용) */
 function view(title, html) {
   const dlg = document.createElement("dialog"); dlg.className = "doc-dlg";
@@ -247,5 +288,5 @@ function view(title, html) {
   return dlg;
 }
 
-window.IeumContract = { drawBankTransfer, BANKS, defaults, hours, toCheck, docHtml, sealFor, drawSeal, openSign, synthPay, payslipHtml, view, safeImg, fmtBiz };
+window.IeumContract = { DOC_SCALE, drawBankTransfer, drawCertificate, CERT_SAMPLES, BANKS, defaults, hours, toCheck, docHtml, sealFor, drawSeal, openSign, synthPay, payslipHtml, view, safeImg, fmtBiz };
 })();

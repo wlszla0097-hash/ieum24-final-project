@@ -72,9 +72,14 @@ def read(body: dict, today: date | None = None) -> dict:
         raise ApiError(400, "missing_input", "필수값을 입력하세요: 수료증 파일")
     if size > MAX_FILE:
         raise ApiError(413, "too_large", "파일이 너무 큽니다. 3MB 이하로 올려 주세요. (사진은 해상도를 줄이면 됩니다)")
-    if not provider():
+    truth = body.get("sample_truth") if isinstance(body.get("sample_truth"), dict) else None
+    if provider():
+        ai = generate_json(SYSTEM, "첨부한 서류를 판독해 JSON으로 답하세요.", max_tokens=500, file={"media_type": mt, "data": data})
+        source = "ai"
+    elif truth:  # 시연용 예시 서류: AI 키가 없으면 그릴 때 기록한 값으로 (다른 서류 판독과 같은 방식)
+        ai, source = truth, "synthetic_truth"
+    else:
         raise ApiError(503, "ai_not_configured", "AI 기능이 설정되지 않아 판독할 수 없습니다. 날짜를 직접 입력해 주세요.")
-    ai = generate_json(SYSTEM, "첨부한 서류를 판독해 JSON으로 답하세요.", max_tokens=500, file={"media_type": mt, "data": data})
     program_text, course = text(ai.get("program_text"), 60), text(ai.get("course"), 80)
     day = d(ai.get("date"))
     if day and day > today:
@@ -84,7 +89,7 @@ def read(body: dict, today: date | None = None) -> dict:
     return {"ok": True, "readable": bool(ai.get("readable", True)) and bool(program_text or course),
             "doc_type": text(ai.get("doc_type"), 10), "program": program, "program_text": program_text, "course": course,
             "issuer": text(ai.get("issuer"), 40), "date": day.isoformat() if day else "", "date_label": label,
-            "model": model_name(), "note": "AI 판독값입니다. 서류와 같은지 확인하고 틀리면 고쳐 주세요. 파일은 저장하지 않습니다."}
+            "model": model_name() if source == "ai" else None, "source": source, "note": "AI 판독값입니다. 서류와 같은지 확인하고 틀리면 고쳐 주세요. 파일은 저장하지 않습니다."}
 
 
 CLAIM_SYSTEM = """당신은 지원금 신청 서류(급여명세서·이체확인증)를 읽는 판독 보조자입니다.
