@@ -49,11 +49,14 @@ def is_youth(age, military_months: int = 0) -> bool:
 
 
 def history_flags(person: dict, before: date | None = None) -> dict:
-    """참여 이력·고용보험 이력 → 취업애로청년 근거 (국취 참여 후 최초 취업 / 청년도전 수료)."""
+    """참여 이력·고용보험 이력 → 취업애로청년 근거 (국취 참여 후 최초 취업 / 청년도전 수료).
+    before = 채용일: 주면 '참여(인정) 후 채용', '수료 후 채용'인지까지 본다(채용 확정 뒤 판정). 없으면 지원 단계 예상 판정."""
     flags = {"kuchwi_first_job": False, "dojeon_completed": False, "evidence": []}
     ins = person.get("insurance") or []
     for p in person.get("programs") or []:
-        if p.get("type") == "국민취업지원제도" and d(p.get("qualified")) and d(p.get("iap")):
+        if p.get("type") == "국민취업지원제도" and d(p.get("qualified")) and d(p.get("iap")) and before and d(p["qualified"]) >= before:
+            flags["evidence"].append(f"국민취업지원제도 수급자격 인정({p['qualified']})이 채용일({before}) 이후 → '참여 후 취업' 아님")
+        elif p.get("type") == "국민취업지원제도" and d(p.get("qualified")) and d(p.get("iap")):
             start = d(p["qualified"])
             jobs_after = [i for i in ins if d(i.get("acquired")) and d(i["acquired"]) >= start
                           and (before is None or d(i["acquired"]) < before)]
@@ -65,6 +68,8 @@ def history_flags(person: dict, before: date | None = None) -> dict:
         if p.get("type") == "청년도전지원사업" and d(p.get("completed")) and (before is None or d(p["completed"]) < before):
             flags["dojeon_completed"] = True
             flags["evidence"].append(f"청년도전지원사업 수료({p['completed']})")
+        elif p.get("type") == "청년도전지원사업" and d(p.get("completed")):
+            flags["evidence"].append(f"청년도전지원사업 수료({p['completed']})가 채용일({before}) 이후 → '수료 후 채용' 아님")
     c = person.get("cert")
     if c and c.get("matched"):
         flags["evidence"].append(f"증빙 첨부: {c['program']} 서류({c.get('issuer') or '발급기관 미판독'}) — AI 판독 날짜 {c['date']}가 입력값과 일치")
@@ -73,10 +78,10 @@ def history_flags(person: dict, before: date | None = None) -> dict:
     return flags
 
 
-def judge(person: dict, post: dict, consent: bool) -> dict:
+def judge(person: dict, post: dict, consent: bool, hire: date | None = None) -> dict:
     """지원자 1명 × 공고 1건에 대한 배지 판단. seeker_text 는 본인에게만, employer 에는 badge 여부만 보낸다."""
     cap = is_capital(post.get("region"))
-    flags = history_flags(person)
+    flags = history_flags(person, before=hire)  # 채용 확정 뒤에는 채용일 기준(참여·수료가 채용보다 먼저인지)
     youth = is_youth(person.get("age"), person.get("military_months") or 0)
     mil = youth and mil_youth(person.get("age"), person.get("military_months") or 0)
     base = {"badge": False, "eligible": False, "basis": GUIDE_YOUTH, "flags": flags}

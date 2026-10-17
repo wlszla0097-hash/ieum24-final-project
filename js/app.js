@@ -118,15 +118,26 @@ $$("#seekForm [data-consent]").forEach((el) => el.addEventListener("change", () 
 
 /* 증빙 서류 판독: AI는 읽기만 하고, 값은 본인이 확인한 뒤 폼에 남는다 */
 const toBase64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
+/* 시연용 예시 증빙 서류: 가상 양식 이미지를 만들어 '첨부한 것처럼' 쓴다 (내 파일을 고르면 그쪽이 우선) */
+$("#certSample").addEventListener("change", (e) => {
+  const c = window.IeumContract.CERT_SAMPLES[e.target.value];
+  state.certSample = c ? { media_type: "image/png", data: window.IeumContract.drawCertificate(c).split(",")[1], label: e.target.selectedOptions[0].text,
+    truth: { doc_type: c.kind === "kuchwi" ? "참여확인서" : "수료증", program_text: c.rows.find(([k]) => k === "사업명")?.[1] || "", course: c.rows.find(([k]) => k === "과정명")?.[1] || "",
+      issuer: c.issuer.replace(/ (센터장|소장|원장)$/, ""), date: c.truth.date, date_label: c.kind === "kuchwi" ? "수급자격 인정일" : "수료일", readable: true } } : null;
+  $("#certSampleName").textContent = c ? "예시 서류를 첨부했어요 → [AI로 읽기]" : "";
+  if (c) $("#certFile").value = "";
+});
+$("#certFile").addEventListener("change", () => { if ($("#certFile").files[0]) { state.certSample = null; $("#certSample").value = ""; $("#certSampleName").textContent = ""; } });
 $("#certBtn").addEventListener("click", async () => {
-  const out = $("#certResult"), file = $("#certFile").files[0];
+  const out = $("#certResult"), file = $("#certFile").files[0], sample = !file && state.certSample;
   if (!seekEl("agree_cert").checked) return (out.innerHTML = '<p class="msg error">[선택] 증빙 서류 AI 판독에 동의해야 읽을 수 있어요. 동의하지 않으면 날짜를 직접 입력하세요.</p>');
-  if (!file) return (out.innerHTML = '<p class="msg error">필수값을 입력하세요: 증빙 파일</p>');
-  if (file.size > 3 * 1024 * 1024) return (out.innerHTML = '<p class="msg error">파일이 너무 큽니다. 3MB 이하로 올려 주세요.</p>');
+  if (!file && !sample) return (out.innerHTML = '<p class="msg error">필수값을 입력하세요: 증빙 파일 (또는 예시 서류 선택)</p>');
+  if (file && file.size > 3 * 1024 * 1024) return (out.innerHTML = '<p class="msg error">파일이 너무 큽니다. 3MB 이하로 올려 주세요.</p>');
   const btn = $("#certBtn"); btn.disabled = true; btn.textContent = "읽는 중…";
   out.innerHTML = '<p class="muted">AI가 서류를 읽고 있어요 (10초 안팎)…</p>';
   try {
-    const r = await api("/api/certificate", { method: "POST", timeoutMs: 45000, body: { media_type: file.type, data: await toBase64(file), consent: true } });
+    const r = await api("/api/certificate", { method: "POST", timeoutMs: 45000,
+      body: sample ? { media_type: sample.media_type, data: sample.data, consent: true, sample_truth: sample.truth } : { media_type: file.type, data: await toBase64(file), consent: true } });
     state.cert = { program: r.program, date: r.date, issuer: r.issuer, course: r.course };
     if (r.program === "청년도전지원사업") { seekEl("dojeon").checked = true; if (r.date) seekEl("dojeon_completed").value = r.date; }
     if (r.program === "국민취업지원제도") { seekEl("kuchwi").checked = true; if (r.date) seekEl("kuchwi_qualified").value = r.date; }

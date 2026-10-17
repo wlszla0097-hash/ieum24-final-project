@@ -15,7 +15,8 @@ const b64 = (u) => u.split(",")[1];
 const S = { ctx: null, files: {}, truth: null, res: null, onDone: null };
 
 const FONT = (g, sz, b) => (g.font = `${b ? "700 " : ""}${sz}px "Noto Sans KR","Malgun Gothic",sans-serif`);
-const paper = (w, h) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.fillStyle = "#111"; g.textBaseline = "top"; return [cv, g]; };
+const paper = (w, h) => { const k = (window.IeumContract && window.IeumContract.DOC_SCALE) || 2;  // 2배 해상도 (AI 판독 선명도)
+  const cv = document.createElement("canvas"); cv.width = w * k; cv.height = h * k; const g = cv.getContext("2d"); g.scale(k, k); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.fillStyle = "#111"; g.textBaseline = "top"; return [cv, g]; };
 
 /** 표준근로계약서(기간의 정함이 없는 경우) 항목 배치를 따른 합성 그림 */
 function drawContract(c) {
@@ -59,10 +60,13 @@ function drawBizreg(c) {
 }
 
 /** 시연 사례: 정상 / 오류(계약서 항목 누락·휴게 부족·공고와 임금 불일치) / 공공데이터 걸림(임금체불 명단공개 기업) */
+/** 기간제 공고면 예시 계약서에도 종료일(1년)을 넣는다 — 정상 사례가 '종료일 없음'으로 걸리지 않게 */
+const endFor = (p) => { if (!/계약|기간/.test(String(p.emp_type || "")) || !p.hire_date) return "";
+  const d = new Date(p.hire_date); d.setFullYear(d.getFullYear() + 1); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); };
 const CASES = {
-  ok: { label: "정상 사례", contract: (p, w) => ({ company: p.company, worker: w, start: p.hire_date, end: "", place: p.region, job: p.title, daily: 8, brk: 60, weekly: 40, holiday: true, payday: true, leave: true, wage: p.wage, allow: 0 }),
+  ok: { label: "정상 사례", contract: (p, w) => ({ company: p.company, worker: w, start: p.hire_date, end: endFor(p), place: p.region, job: p.title, daily: 8, brk: 60, weekly: 40, holiday: true, payday: true, leave: true, wage: p.wage, allow: 0 }),
     biz: (p) => ({ busino: p.busino || "0008100012", company: p.company, kind: "법인사업자", opened: "2015-03-02", addr: `${p.region} 가상로 1`, sector: "서비스업", item: p.industry || "소프트웨어 개발 및 공급" }) },
-  bad: { label: "오류 사례 (휴게 부족·지급일 누락·임금 불일치)", contract: (p, w) => ({ company: p.company, worker: w, start: p.hire_date, end: "", place: p.region, job: p.title, daily: 8, brk: 30, weekly: 40, holiday: true, payday: false, leave: true, wage: Math.max(p.wage - 100000, 2000000), allow: 0 }),
+  bad: { label: "오류 사례 (휴게 부족·지급일 누락·임금 불일치)", contract: (p, w) => ({ company: p.company, worker: w, start: p.hire_date, end: endFor(p), place: p.region, job: p.title, daily: 8, brk: 30, weekly: 40, holiday: true, payday: false, leave: true, wage: Math.max(p.wage - 100000, 2000000), allow: 0 }),
     biz: (p) => ({ busino: p.busino || "0008100012", company: p.company, kind: "법인사업자", opened: "2015-03-02", addr: `${p.region} 가상로 1`, sector: "서비스업", item: p.industry || "소프트웨어 개발 및 공급" }) },
   arrears: { label: "공공데이터 걸림 (임금체불 명단공개 기업)", contract: (p, w) => CASES.ok.contract(p, w),
     biz: (p) => ({ busino: "0008100112", company: "한결전자(가상)", kind: "법인사업자", opened: "2012-07-01", addr: "경상북도 구미시 가상로 11", sector: "제조업", item: "전자부품" }) },

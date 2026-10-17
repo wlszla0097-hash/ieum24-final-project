@@ -161,7 +161,17 @@ def stored(pg, col):
 # ---------- 시나리오 ----------
 def test_full_flow_existing_company(app):
     pg = app
-    jid = seeker_apply(pg, detail=True)
+    # 6개월 시연용 구직자(국취 인정 2025-11-03): [기존 근로자 등록] 채용일보다 참여가 먼저라 채용 확정 뒤에도 근거 충족
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.select_option("#seekExample", "P-S04"); pg.fill("#s_alias", "윤하람")
+    pg.check("#seekForm [name=agree_privacy]"); pg.check("#seekForm [name=consent]"); pg.check("#seekForm [name=agree_detail]")
+    pg.click("#seekBtn"); pg.wait_for_selector("#seekResult .apply", timeout=30000)
+    jid = pg.evaluate("""() => { const b = [...document.querySelectorAll('#seekResult .apply')].find(b => { let p = b.parentElement;
+      for (let i = 0; i < 6 && p; i++, p = p.parentElement) if (p.innerText.includes('지원제도 활용 가능')) return true; return false; }); return b && b.dataset.id; }""")
+    assert jid, "배지 대상 공고가 있어야 함"
+    pg.click(f"#seekResult .apply[data-id='{jid}']")
+    pg.wait_for_function(f"document.querySelector(\"#seekResult .apply[data-id='{jid}']\").textContent.includes('지원 완료')")
     open_company(pg, company_key_for(pg, jid))
     hire_stored(pg)
     pg.click("#ct6m")  # 기존 근로자 등록 — 6개월분 급여 지급일이 지난 시점 (D9: 미리 발급 없음)
@@ -175,6 +185,7 @@ def test_full_flow_existing_company(app):
     pg.goto(pg.base + "/#officer"); pg.wait_for_selector(".case.fresh")
     card = pg.locator(".case.fresh").first
     assert "6/6개월" in card.inner_text()
+    assert "취업애로청년 근거: 국민취업지원제도" in card.inner_text() and "2025-11-03" in card.inner_text()  # 채용일 기준 판정
     card.locator(".decide[data-v='검토 완료']").click()
     pg.wait_for_function("document.querySelector('.case.fresh .decision').textContent.includes('저장됨')")
     pg.reload(); pg.wait_for_selector(".case.fresh")
@@ -584,4 +595,20 @@ def test_military_extension_example_and_manual_input(app):
     pg.fill("#mil_months", ""); pg.click("#seekBtn")
     assert "의무복무 기간" in pg.inner_text("#seekMsg")
     pg.check("#youth"); assert pg.is_hidden("#milWrap") and not pg.is_checked("#mil")
+    assert not pg.errors, pg.errors
+
+
+# ---------- 2026-10-17: 구직자 증빙 예시 서류 ----------
+def test_seeker_cert_sample_fills_program_date(app):
+    pg = app
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.check("#seekForm [name=agree_cert]")
+    pg.select_option("#certSample", "kuchwi")
+    assert "첨부했어요" in pg.inner_text("#certSampleName")
+    pg.click("#certBtn"); pg.wait_for_selector("#certResult .cert-read", timeout=20000)
+    assert "국민취업지원제도" in pg.inner_text("#certResult") and pg.is_checked("#kuchwi")
+    assert pg.input_value("#kuchwi_qualified") == "2026-04-20"  # 발급일(10/17)이 아니라 수급자격 인정일
+    pg.select_option("#certSample", "training"); pg.click("#certBtn")
+    pg.wait_for_function("document.querySelector('#certResult').textContent.includes('확인되지 않았어요')", timeout=20000)
     assert not pg.errors, pg.errors

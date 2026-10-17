@@ -50,7 +50,7 @@ def contract_from(post: dict, hire: date, given: dict | None) -> dict:
 
 
 def build_case(post: dict, app: dict, hire: date, contract: dict | None = None, today: date | None = None) -> dict:
-    j = judge(app, post, app.get("consent", False))
+    j = judge(app, post, app.get("consent", False), hire=hire)
     pc = posting_check(post)
     cc = contract_check(contract_from(post, hire, contract))
     sch = schedule(hire, today)
@@ -61,7 +61,8 @@ def build_case(post: dict, app: dict, hire: date, contract: dict | None = None, 
     elif j["eligible"]:
         evidence = {"open": False, "title": "근로자 동의 전 — 참여 이력 근거 비공개", "lines": ["지원자가 '채용 후 세부정보 열람'에 동의하지 않았습니다. 신청 시 근로자 본인의 동의가 필요합니다."]}
     else:
-        evidence = {"open": True, "title": "취업애로청년 근거 미확인", "lines": ["참여 이력에서 해당 근거가 확인되지 않음 — 다른 요건 해당 여부는 고용센터 확인"]}
+        evidence = {"open": True, "title": "취업애로청년 근거 미확인",
+                    "lines": history_flags(app, before=hire)["evidence"] + ["참여 이력에서 해당 근거가 확인되지 않음 — 다른 요건 해당 여부는 고용센터 확인"]}
     checklist = [i for i in pc["items"] if i["item"] != "지원 유형"]
     checklist.append({"level": "충족" if sch["months_kept"] >= 6 else CHECK, "item": "고용유지 6개월",
                       "detail": f"채용 {sch['hire_date']} → {sch['months_kept']}개월 경과 (6개월 시점 {sch['six_month_date']})", "basis": GUIDE_YOUTH})

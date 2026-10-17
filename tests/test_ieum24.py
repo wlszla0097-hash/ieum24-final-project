@@ -275,3 +275,19 @@ def test_persona_form_carries_military_fields():
     f = userinput.persona_to_form(p)
     assert f["youth"] is False and f["mil"] is True and f["mil_age"] == "36" and f["mil_months"] == "18"
     assert userinput.persona_to_form({**p, "age": 27})["mil"] is False
+
+
+def test_cert_sample_truth_without_ai_and_answer_file():
+    """수료증 예시 서류: AI 키가 없으면 그릴 때 기록한 값으로 판독 (다른 서류와 같은 방식), 정답표 파일 형식"""
+    import certificate
+    img = {"media_type": "image/png", "data": "iVBORw0KGgo="}
+    truth = {"doc_type": "수료증", "program_text": "청년도전지원사업", "course": "단기 프로그램", "issuer": "누리청년센터(가상)",
+             "date": "2026-05-29", "date_label": "수료일", "readable": True}
+    r = certificate.read({**img, "consent": True, "sample_truth": truth}, today=date(2026, 10, 17))
+    assert r["program"] == "청년도전지원사업" and r["date"] == "2026-05-29" and r["source"] == "synthetic_truth" and r["model"] is None
+    with pytest.raises(ApiError):
+        certificate.read({**img, "consent": True}, today=date(2026, 10, 17))  # 실제 서류는 AI 없이 판독 불가
+    ans = json.loads((Path(__file__).resolve().parent.parent / "data/synthetic/docs/cert_answer.json").read_text(encoding="utf-8"))
+    assert {a["expect_program"] for a in ans} == {"청년도전지원사업", "국민취업지원제도", "기타"}
+    for a in ans:
+        assert (Path(__file__).resolve().parent.parent / "data/synthetic/docs" / a["file"]).stat().st_size > 10_000

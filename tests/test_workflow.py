@@ -1,5 +1,6 @@
 """시연 흐름(저장 → 지원 → 채용 확정 → 근로계약 → 급여명세서 대조) 서버 쪽 테스트. AI 호출 없음."""
 import base64
+import json
 import os
 import sys
 from datetime import date
@@ -176,3 +177,89 @@ def test_contract_below_min_wage_is_rejected_with_basis():
     assert e.value.status == 422 and e.value.code == "min_wage"
     d = e.value.detail
     assert "최저임금" in d["detail"] and "제6조" in d["law"] and "제28조" in d["penalty"]
+
+
+def test_transfer_rows_fix_ai_field_mixups(monkeypatch):
+    """실제 배포에서 Haiku가 보낸 분 자리에 은행 이름을 넣거나 보낸 분·받는 분을 뒤바꿈 → 표 항목 이름으로 바로잡음"""
+    rows = [{"label": "거래일시", "value": "2026-05-10 09:12:30"}, {"label": "출금계좌", "value": "110-***-***090"},
+            {"label": "보내는 분(예금주)", "value": "김대표"}, {"label": "입금은행", "value": "가람은행(가상)"},
+            {"label": "받는 분(예금주)", "value": "서지우"}, {"label": "이체금액", "value": "2,030,970원"},
+            {"label": "받는 분 통장 표시", "value": "4월 급여"}]
+    assert certificate._from_rows(rows) == {"sender": "김대표", "recipient": "서지우", "amount": "2030970", "date": "2026-05-10"}
+    assert certificate._from_rows([{"label": "받는 분 통장 표시", "value": "급여"}]) == {}  # 메모 줄은 받는 분이 아님
+    assert certificate._from_rows(None) == {} and certificate._from_rows([{"label": 1}]) == {}
+    swapped = {"transfer": {"recipient": "김대표", "sender": "서지우", "amount": "2030970", "date": "2026-05-10"}, "rows": rows}
+    monkeypatch.setattr(certificate, "provider", lambda: "claude")
+    monkeypatch.setattr(certificate, "generate_json", lambda *a, **k: json.loads(json.dumps(swapped)))
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    r = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": {"worker": "서지우", "company": "다온물류(가상)"},
+                              "issued_payslip": {"name": "서지우", "ym": "2026-04", "pay_date": "2026-05-10", "gross": "2300000", "deduction": "269030", "net": "2030970"}})
+    assert r["transfer"]["sender"] == "김대표" and r["transfer"]["recipient"] == "서지우"
+    lv = {i["item"]: i["level"] for i in r["check"]["items"]}
+    assert lv["성명"] == "일치" and lv["이체자(보내는 분)"] == "확인 필요"  # 대표 개인 계좌 사례가 의도대로
+
+
+def test_portfolio_keeps_program_paragraph_masked_and_structured(monkeypatch):
+    import seeker
+    ai_out = {"headline": "엑셀로 사무 업무를 처리하는 신입", "summary": "사무행정 실무 훈련 160시간을 수료했습니다. 행사 명단을 관리했습니다.",
+              "strengths": [{"title": "문서 작성", "evidence": "사무행정 실무 훈련"}, {"title": "꼼꼼함", "evidence": "명단 관리"}],
+              "sections": [{"title": "진로 상담", "body": "국민취업지원제도 상담에서 취업활동계획을 세웠습니다."},
+                           {"title": "사무행정 훈련", "body": "엑셀을 300시간 배웠습니다."},  # 원문에 없는 숫자 → 차단
+                           {"title": "복지관 행사 보조", "body": "참가자 명단과 물품을 관리했습니다."}],
+              "fit": "사무 직무에서 명단·자료 관리 경험을 활용할 수 있습니다.", "skills": ["엑셀", "파이썬"]}
+    monkeypatch.setattr(seeker, "generate_json", lambda *a, **k: ai_out)
+    p = {"ai_consent": True, "desire": {"job": "사무"}, "points": ["사무행정 실무 훈련", "복지관 행사 보조"],
+         "experience": "- 진로상담 4회 (취업활동계획 수립)\n- 사무행정 실무 (엑셀·문서) 160시간\n- 복지관 행사 명단·물품 관리"}
+    r = seeker.portfolio(p)
+    doc = r["portfolio"]
+    assert "■ 핵심 역량" in doc and "• 문서 작성 — 사무행정 실무 훈련" in doc and "■ 사무 직무에서" in doc
+    assert "■ 진로 상담" in doc and "고용서비스 프로그램 상담에서 취업 계획을" in doc  # 문단을 버리지 않고 사업명만 바꿈
+    assert "국민취업" not in doc and "취업활동계획" not in doc and "300시간" not in doc
+    assert "엑셀" in doc and "파이썬" not in doc and r["meta"]["guard_blocked"] == 1
+
+
+def test_one_char_ocr_slips_are_not_false_alarms():
+    """배포 실측: Haiku가 '다온물류'를 '다운물류', '박서연'을 '박시연'으로 읽음 → 회사는 일치(표시), 근로자 이름은 확인 필요, 전혀 다르면 그대로"""
+    from claimdocs import check_month
+    ps = {"name": "서지우", "ym": "2026-04", "net": "2030970"}
+    lv = lambda tr: {i["item"]: (i["level"], i["detail"]) for i in check_month("2026-04", ps, tr, {"worker": "서지우", "company": "다온물류 (가상)"})["items"]}  # noqa: E731
+    r = lv({"recipient": "서지우", "sender": "다운물류 (가상)", "amount": "2030970", "date": "2026-05-10"})
+    assert r["이체자(보내는 분)"][0] == "일치" and "판독 오차" in r["이체자(보내는 분)"][1]
+    assert lv({"recipient": "서지우", "sender": "다운몰류 (가상)", "amount": "2030970"})["이체자(보내는 분)"][0] == "일치"  # 실측: 모음 두 개 오독
+    assert lv({"recipient": "서지우", "sender": "다온유통", "amount": "2030970"})["이체자(보내는 분)"][0] == "확인 필요"  # 자음이 다르면 다른 회사
+    assert lv({"recipient": "서지우", "sender": "김대표", "amount": "2030970"})["이체자(보내는 분)"][0] == "확인 필요"
+    assert lv({"recipient": "서지운", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "확인 필요"
+    assert lv({"recipient": "박서연", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"
+    assert lv({"recipient": "허지우", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"  # 성이 다르면 다른 사람
+
+
+def test_case_eligibility_uses_hire_date():
+    """채용 확정 뒤 판정은 채용일 기준: 국취 인정·청년도전 수료가 채용보다 먼저여야 근거 (지원 단계 예상 판정은 그대로)"""
+    from rules import judge
+    post = {"emp_type": "정규직", "region": "서울 강남구", "priority": True, "industry": "소프트웨어"}
+    kuchwi = {"age": 27, "programs": [{"type": "국민취업지원제도", "qualified": "2026-04-20", "iap": "2026-05-02"}], "insurance": []}
+    dojeon = {"age": 26, "programs": [{"type": "청년도전지원사업", "completed": "2026-05-29"}], "insurance": []}
+    for p in (kuchwi, dojeon):
+        assert judge(p, post, True)["eligible"]                                  # 지원 단계: 예상 대상
+        assert judge(p, post, True, hire=date(2026, 6, 1))["eligible"]           # 참여·수료 뒤 채용
+        early = judge(p, post, True, hire=date(2026, 4, 1))                      # 참여·수료 전에 채용
+        assert not early["eligible"] and "채용일" in " ".join(early["flags"]["evidence"])
+    case = cases.build_case(parse_posting(POST), {**cases.resolve_applicant({**parse_posting(POST), "id": "U-t"}, "U-t-Sx", None, {"alias": "가", "profile": SEEK}), "programs": dojeon["programs"]},
+                            date(2026, 4, 1), today=date(2026, 10, 17))
+    assert case["evidence"]["title"] == "취업애로청년 근거 미확인" and any("채용일" in l for l in case["evidence"]["lines"])
+
+
+def test_swapped_reading_is_corrected_and_corp_jamo_slip():
+    """실측: 윤하람 건에서 보낸 분=윤하람·받는 분=김대표로 뒤바뀜, 회사명 '다운몬류' → 바로잡고 표시"""
+    from claimdocs import check_month
+    ps = {"name": "윤하람", "ym": "2026-04", "gross": "2300000", "net": "2030970"}
+    ctx = {"worker": "윤하람", "company": "다온물류 (가상)"}
+    r = check_month("2026-04", ps, {"recipient": "김대표", "sender": "윤하람", "amount": "2030970"}, ctx)
+    lv = {i["item"]: i["level"] for i in r["items"]}
+    assert lv["성명"] == "일치" and lv["이체자(보내는 분)"] == "확인 필요" and lv["판독 보정"] == "참고" and r["level"] == "확인 필요"
+    ok = check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몬류 (가상)", "amount": "2030970"}, ctx)
+    assert ok["level"] == "일치"
+    f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
+    out = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": ctx, "issued_payslip": {**ps, "pay_date": "2026-05-10", "deduction": "0"},
+                                "sample_truth": {"transfer": {"recipient": "김대표", "sender": "윤하람", "amount": "2030970", "date": "2026-05-10"}}})
+    assert out["transfer"]["sender"] == "김대표" and out["transfer"]["recipient"] == "윤하람"  # 화면 비교표도 바로잡힌 값
