@@ -25,9 +25,9 @@ class Redirect(Exception):
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str):
+    def __init__(self, status: int, code: str, message: str, detail: dict | None = None):
         super().__init__(message)
-        self.status, self.code, self.message = status, code, message
+        self.status, self.code, self.message, self.detail = status, code, message, detail
 
 
 class JsonHandler(BaseHTTPRequestHandler):
@@ -91,7 +91,7 @@ class JsonHandler(BaseHTTPRequestHandler):
         except Redirect as r:
             self._redirect(r.location)
         except ApiError as e:
-            self._send(e.status, {"ok": False, "error": e.code, "message": e.message})
+            self._send(e.status, {"ok": False, "error": e.code, "message": e.message, **({"detail": e.detail} if e.detail else {})})
         except Exception as e:  # 예상 못한 오류도 JSON으로 안내
             print("[server error]", repr(e))
             self._send(500, {"ok": False, "error": "server_error", "message": "서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요."})

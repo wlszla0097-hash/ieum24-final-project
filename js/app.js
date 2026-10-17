@@ -58,7 +58,9 @@ async function api(path, { method = "GET", body, timeoutMs = 45000, onSlow, head
     try { data = await res.json(); } catch (e) { /* JSON 아닌 응답 */ }
     if (!res.ok || !data || data.ok === false) {
       const fallback = res.status >= 500 ? "서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도하세요." : "요청을 처리하지 못했습니다. 입력값을 확인하세요.";
-      throw new Error(`${(data && data.message) || fallback} (오류 코드 ${res.status})`);
+      const e = new Error(`${(data && data.message) || fallback} (오류 코드 ${res.status})`);
+      if (data) Object.assign(e, { code: data.error, detail: data.detail });
+      throw e;
     }
     return data;
   } catch (err) {

@@ -108,8 +108,11 @@ function bindSwitch(box) {
   const sw = $("#mdSwitch", box);
   if (sw) sw.onchange = () => { if (!sw.value || sw.value === S.me()) return; S.newMe(sw.value); clear(); seekerInbox(); };
 }
+/** 서명·날인 이력 — 바꿔도 이전 기록을 남긴다 (최근 20건) */
+const signLog = (c, who, kind, action) => [...(c.sign_log || []), { who, kind, action, at: new Date().toISOString() }].slice(-20);
 async function signContract(c, r) {
-  Object.assign(c, { worker_sign: r.data, sign_kind: r.kind, signed_at: new Date().toISOString(), status: "체결 완료" });
+  Object.assign(c, { worker_sign: r.data, sign_kind: r.kind, signed_at: new Date().toISOString(), status: "체결 완료",
+    sign_log: signLog(c, "근로자", r.kind, "서명 (내 서류함)") });
   await S.put("contracts", c.id, c);
   if (c.case_id) { const cs = await S.get("cases", c.case_id); if (cs) await S.put("cases", cs.id, { ...cs, contract_status: c.status, sign_kind: r.kind }); }
 }
@@ -400,6 +403,7 @@ function renderContract() {
           ${[["emp", "고용보험"], ["acc", "산재보험"], ["pen", "국민연금"], ["hea", "건강보험"]].map(([k, l]) => `<label><input type="checkbox" data-ins="${k}" ${f.ins[k] ? "checked" : ""}> ${l}</label>`).join("")}</div></fieldset>
       </form>
       <div><div id="ctDoc"></div>
+        <div class="btn-row" id="ctSignBtns"></div>
         <p class="meta">근로자 서명: 시연에서는 이 화면의 서명란 버튼으로 바로 받을 수 있고, 저장 후 근로자가 구직자 화면 [내 서류함]에서 서명할 수도 있습니다.</p></div>
     </div>
     <p class="msg" id="ctMsg" role="alert" hidden></p>
@@ -425,10 +429,39 @@ function changed() {
 }
 function drawDoc() {
   const ct = E.ct;
-  $("#ctDoc").innerHTML = C.docHtml(ct.fields, { seal: E.seal, sign: ct.worker_sign, signable: true });
+  $("#ctDoc").innerHTML = C.docHtml(ct.fields, { seal: ct.employer_sign || E.seal, sign: ct.worker_sign, signable: true });
+  const signWorker = async (change) => { const r = await C.openSign(ct.fields.worker, "근로자"); if (!r) return;
+    Object.assign(ct, { worker_sign: r.data, sign_kind: r.kind, signed_at: new Date().toISOString(), sign_log: signLog(ct, "근로자", r.kind, change ? "서명 변경" : "서명") });
+    drawDoc(); if (change) await keepSign("근로자 서명"); };
   const b = $("#ctDoc [data-sign]");
-  if (b) b.onclick = async () => { const r = await C.openSign(ct.fields.worker); if (!r) return;
-    Object.assign(ct, { worker_sign: r.data, sign_kind: r.kind, signed_at: new Date().toISOString() }); drawDoc(); };
+  if (b) b.onclick = () => signWorker(false);
+  const box = $("#ctSignBtns"); if (!box) return;
+  box.innerHTML = `${ct.worker_sign ? '<button class="btn ghost sm" type="button" data-resign="worker">✍ 근로자 서명 변경</button>' : ""}
+    <button class="btn ghost sm" type="button" data-resign="employer">🔴 사업주 서명·날인 변경</button>
+    ${ct.employer_sign ? '<button class="btn ghost sm" type="button" data-resign="seal">법인 인장으로 되돌리기</button>' : ""}
+    <span class="muted">사업주: ${ct.employer_sign ? `직접 지정한 ${esc(ct.employer_kind || "서명")}` : "등록된 법인 인장(가상)"} · 근로자: ${esc(ct.worker_sign ? ct.sign_kind || "서명" : "서명 전")}</span>`;
+  $('[data-resign="worker"]', box)?.addEventListener("click", () => signWorker(true));
+  $('[data-resign="employer"]', box).onclick = async () => {
+    const r = await C.openSign(ct.company, "사업주"); if (!r) return;
+    Object.assign(ct, { employer_sign: r.data, employer_kind: r.kind, sign_log: signLog(ct, "사업주", r.kind, "서명·날인 변경") });
+    drawDoc(); await keepSign("사업주 서명·날인");
+  };
+  $('[data-resign="seal"]', box)?.addEventListener("click", async () => {
+    Object.assign(ct, { employer_sign: "", employer_kind: "", sign_log: signLog(ct, "사업주", "법인 인장", "법인 인장으로 되돌림") });
+    drawDoc(); await keepSign("사업주 날인");
+  });
+}
+/** 서명만 바꾼 경우: 저장된 계약 내용과 같으면 바로 저장, 계약 내용도 고쳤으면 [계약서 다시 저장] 안내 */
+async function keepSign(what) {
+  const ct = E.ct;
+  if (!ct.case_id) return toast(`${what}을(를) 바꿨어요. [계약서 저장]을 누르면 함께 저장돼요.`);
+  const saved = await S.get("contracts", ct.id);
+  if (!saved || JSON.stringify(saved.fields) !== JSON.stringify(ct.fields)) return toast(`${what}을(를) 바꿨어요. 계약 내용도 바뀌어 [계약서 다시 저장]을 눌러야 반영돼요.`);
+  Object.assign(ct, { seal: ct.employer_sign || E.seal, status: ct.worker_sign ? "체결 완료" : "근로자 서명 대기" });
+  await S.put("contracts", ct.id, ct);
+  const cs = await S.get("cases", ct.case_id);
+  if (cs) await S.put("cases", cs.id, { ...cs, contract_status: ct.status, sign_kind: ct.sign_kind || "" });
+  toast(`${what}을(를) 바꿔 저장했어요. 이전 서명 기록은 계약서 저장 기록에 남아요.`);
 }
 async function saveContract() {
   const ct = E.ct, f = ct.fields, msg = $("#ctMsg"), h = C.hours(f);
@@ -448,7 +481,7 @@ async function saveContract() {
     const cs = r.case;
     if (ct.case_id && ct.case_id !== cs.case_id) await S.del("cases", ct.case_id).catch(() => {});
     const prev = (await S.get("cases", cs.case_id)) || {};
-    Object.assign(ct, { case_id: cs.case_id, check: cs.contract, seal: E.seal, status: ct.worker_sign ? "체결 완료" : "근로자 서명 대기", saved_at: new Date().toISOString() });
+    Object.assign(ct, { case_id: cs.case_id, check: cs.contract, seal: ct.employer_sign || E.seal, status: ct.worker_sign ? "체결 완료" : "근로자 서명 대기", saved_at: new Date().toISOString() });
     await S.put("contracts", ct.id, ct);
     const voided = await voidChanged();
     await S.put("cases", cs.case_id, { ...cs, worker: f.worker, contract_id: ct.id, posting_id: ct.posting_id, seeker_id: ct.seeker_id,
@@ -459,12 +492,23 @@ async function saveContract() {
       const aid = `${ct.posting_id}~${ct.seeker_id}`, app = await S.get("applications", aid);
       if (app) await S.put("applications", aid, { ...app, status: "채용 확정", contract_id: ct.id });
     }
+    msg.classList.remove("error"); $('[data-f="base_wage"]', $("#contractPanel"))?.classList.remove("invalid");
     toast(`계약서를 저장했어요 (${esc(ct.status)}). <a href="#officer">담당자 확인 대시보드</a>에 신청 건이 생겼어요.`
       + (voided ? ` 바뀐 계약과 맞지 않는 명세서 ${voided}건은 정정(취소) 표시로 남겼어요.` : ""));
     showCtResult();
     loadDetail();
-  } catch (err) { showMsg(msg, err.message); }
-  finally { btn.disabled = false; btn.textContent = "계약서 다시 저장 · 근로계약 점검"; }
+  } catch (err) {
+    if (err.code === "min_wage" && err.detail) {
+      const d = err.detail;
+      msg.hidden = false; msg.classList.add("error");
+      msg.innerHTML = `<b>⛔ 최저임금 미달 — 이 근로계약서는 저장할 수 없어요.</b><br>${esc(d.detail)}<br>
+        <small>근거: ${esc(d.law)}<br>${esc(d.penalty)}</small><br>월급(또는 기타급여)을 고친 뒤 다시 저장해 주세요.`;
+      const w = $('[data-f="base_wage"]', $("#contractPanel")); if (w) { w.classList.add("invalid"); w.focus(); }
+      msg.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast("최저임금에 미달해 계약서를 저장하지 않았어요. 근거를 확인하고 임금을 고쳐 주세요.");
+    } else showMsg(msg, err.message);
+  }
+  finally { btn.disabled = false; btn.textContent = ct.case_id ? "계약서 다시 저장 · 근로계약 점검" : "계약서 저장 · 근로계약 점검 · 담당자 신청 건 만들기"; }
 }
 async function showCtResult() {
   const ct = E.ct, res = ct.check || [];
@@ -717,8 +761,9 @@ async function viewContract(id) {
   if (!c) return toast("계약서를 찾지 못했어요.");
   const chk = (c.check || []).filter((r) => r.level !== "적정");
   C.view(`근로계약서 — ${c.company} · ${c.fields.worker} (${c.status})`, C.docHtml(c.fields, { seal: c.seal, sign: c.worker_sign })
-    + `<div class="lc-note"><b>저장 기록</b> 사업주 날인: 법인 인장(가상) · 근로자: ${esc(c.sign_kind || "서명 대기")}${c.signed_at ? ` (${esc(new Date(c.signed_at).toLocaleString("ko-KR"))})` : ""}<br>
-      규칙 점검: ${chk.length ? chk.map((r) => `${esc(r.item)}(${esc(r.level)})`).join(", ") : "이상 없음"}</div>`);
+    + `<div class="lc-note"><b>저장 기록</b> 사업주: ${esc(c.employer_sign ? `직접 지정한 ${c.employer_kind || "서명"}` : "법인 인장(가상)")} · 근로자: ${esc(c.sign_kind || "서명 대기")}${c.signed_at ? ` (${esc(new Date(c.signed_at).toLocaleString("ko-KR"))})` : ""}<br>
+      규칙 점검: ${chk.length ? chk.map((r) => `${esc(r.item)}(${esc(r.level)})`).join(", ") : "이상 없음"}
+      ${(c.sign_log || []).length ? `<br>서명 이력: ${c.sign_log.map((l) => `${esc(new Date(l.at).toLocaleString("ko-KR"))} ${esc(l.who)} ${esc(l.action)}(${esc(l.kind)})`).join(" · ")}` : ""}</div>`);
 }
 async function viewPays(contractId) {
   const all = (await S.list("payslips")).filter((p) => p.contract_id === contractId).sort((a, b) => a.ym.localeCompare(b.ym) || a.id.localeCompare(b.id));
