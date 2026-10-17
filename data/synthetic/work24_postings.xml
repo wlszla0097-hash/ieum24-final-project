@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- 고용24 채용정보 목록 응답 형식 (docs/data-spec.md 연번 1) · 가상 공고 -->
 <wantedRoot>
-  <total>13</total><startPage>1</startPage><display>13</display>
+  <total>14</total><startPage>1</startPage><display>14</display>
   <wanted>
     <wantedAuthNo>K000000001</wantedAuthNo>
     <company>한빛소프트랩(가상)</company>
@@ -365,5 +365,33 @@
     <empTpCd>10</empTpCd>
     <jobsCd>312100</jobsCd>
     <smodifyDtm>202610010900</smodifyDtm>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000014</wantedAuthNo>
+    <company>세움정밀(가상)</company>
+    <busino>0008100045</busino>
+    <indTpNm>기타 기계 및 장비 제조업</indTpNm>
+    <title>생산관리 사무원 엑셀 (마감된 공고)</title>
+    <salTpNm>월급</salTpNm>
+    <sal>250만원</sal>
+    <minSal>2500000</minSal>
+    <maxSal>2500000</maxSal>
+    <region>인천 남동구</region>
+    <holidayTpNm>주5일근무</holidayTpNm>
+    <minEdubg>학력무관</minEdubg>
+    <maxEdubg></maxEdubg>
+    <career>신입</career>
+    <regDt>20260801</regDt>
+    <closeDt>20260930</closeDt>
+    <infoSvc>VALIDATION</infoSvc>
+    <wantedInfoUrl>https://www.work24.go.kr/</wantedInfoUrl>
+    <wantedMobileInfoUrl>https://m.work24.go.kr/</wantedMobileInfoUrl>
+    <zipCd>00000</zipCd>
+    <strtnmCd>0</strtnmCd>
+    <basicAddr>인천광역시 남동구 가상로 45</basicAddr>
+    <detailAddr>2층</detailAddr>
+    <empTpCd>10</empTpCd>
+    <jobsCd>026200</jobsCd>
+    <smodifyDtm>202608010900</smodifyDtm>
   </wanted>
 </wantedRoot>
