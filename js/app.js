@@ -278,7 +278,8 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
       const r = await api("/api/seeker", { method: "POST", body: { ...body, action: "portfolio" } });
       logAI("포트폴리오 초안", body, t0, { model: r.meta.model, ai_used: true, guard_blocked: r.meta.guard_blocked, result: { portfolio: r.portfolio } });
       $("#pfText").value = r.portfolio;
-      m.textContent = `초안 완료 · 원문에 없는 내용으로 차단된 문단 ${r.meta.guard_blocked}개 · 고친 뒤 등록하세요.`;
+      const rm = r.meta.removed || {};
+      m.textContent = `초안 완료 · ${r.meta.chars ?? r.portfolio.length}자 · 원문에 없는 내용 차단 ${r.meta.guard_blocked}건 · 중복 ${rm.duplicate ?? 0}·과장 표현 ${rm.puffery ?? 0}·원문에 없는 기술명 ${rm.unknown_term ?? 0}문장 제외 · 고친 뒤 등록하세요.`;
     } catch (err) { logAI("포트폴리오 초안", body, t0, { ai_used: false, error: err.message }); m.textContent = err.message; } finally { b.disabled = false; }
   });
   $("#pfSave").addEventListener("click", async () => {
