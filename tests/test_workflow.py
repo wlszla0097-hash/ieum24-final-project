@@ -229,3 +229,19 @@ def test_one_char_ocr_slips_are_not_false_alarms():
     assert lv({"recipient": "서지운", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "확인 필요"
     assert lv({"recipient": "박서연", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"
     assert lv({"recipient": "허지우", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"  # 성이 다르면 다른 사람
+
+
+def test_case_eligibility_uses_hire_date():
+    """채용 확정 뒤 판정은 채용일 기준: 국취 인정·청년도전 수료가 채용보다 먼저여야 근거 (지원 단계 예상 판정은 그대로)"""
+    from rules import judge
+    post = {"emp_type": "정규직", "region": "서울 강남구", "priority": True, "industry": "소프트웨어"}
+    kuchwi = {"age": 27, "programs": [{"type": "국민취업지원제도", "qualified": "2026-04-20", "iap": "2026-05-02"}], "insurance": []}
+    dojeon = {"age": 26, "programs": [{"type": "청년도전지원사업", "completed": "2026-05-29"}], "insurance": []}
+    for p in (kuchwi, dojeon):
+        assert judge(p, post, True)["eligible"]                                  # 지원 단계: 예상 대상
+        assert judge(p, post, True, hire=date(2026, 6, 1))["eligible"]           # 참여·수료 뒤 채용
+        early = judge(p, post, True, hire=date(2026, 4, 1))                      # 참여·수료 전에 채용
+        assert not early["eligible"] and "채용일" in " ".join(early["flags"]["evidence"])
+    case = cases.build_case(parse_posting(POST), {**cases.resolve_applicant({**parse_posting(POST), "id": "U-t"}, "U-t-Sx", None, {"alias": "가", "profile": SEEK}), "programs": dojeon["programs"]},
+                            date(2026, 4, 1), today=date(2026, 10, 17))
+    assert case["evidence"]["title"] == "취업애로청년 근거 미확인" and any("채용일" in l for l in case["evidence"]["lines"])
