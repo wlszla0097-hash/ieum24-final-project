@@ -134,8 +134,9 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
     else:
         add(MATCH, "성명", f"{payslip.get('name') or transfer.get('recipient')} — 명세서·이체확인증 일치")
 
-    if swapped:
-        add("참고", "판독 보정", "AI 판독에서 보내는 분·받는 분이 바뀐 것으로 보여 바로잡음 — 원본 확인", "이음24 판독 보정")
+    if swapped:  # 판독 오류일 수도, 실제 근로자→회사 이체(반환 등)일 수도 있다 → 자동으로 정상 처리하지 않음
+        add(CHECK, "이체 방향", "보내는 분이 근로자로 읽힘 — 보내는 분·받는 분을 바꿔 비교했지만, 판독 오류인지 실제 근로자→회사 이체인지 원본 확인 필요",
+            "이음24 판독 점검 (원래 판독값 보존)")
     company = _corp(ctx.get("company"))
     if company:  # 이체자(보내는 분) = 사업주(회사) 명의인지 — 회사명을 알 때만 점검
         sender = _corp(transfer.get("sender"))
@@ -143,8 +144,10 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
             add(CHECK, "이체자(보내는 분)", "이체확인증에서 보내는 분을 읽지 못함 — 원본 확인")
         elif company in sender or sender in company:
             add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 사업주(회사) 명의 계좌에서 이체")
-        elif len(company) >= 3 and (_one_off(sender, company) or _vowel_slip(sender, company) or _corp_slip(sender, company)):  # 회사명 판독 오차는 같은 회사로 보고 표시만 남김
-            add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 회사 {ctx.get('company')}와 글자 일부 차이(판독 오차로 보고 일치 처리, 원본 확인 권장)")
+        elif len(company) >= 3 and _vowel_slip(sender, company):  # 모음만 다름(다온물류→다운몰류): 한글 판독의 전형적 오차
+            add(MATCH, "이체자(보내는 분)", f"{transfer.get('sender')} — 회사 {ctx.get('company')}와 모음만 다름(판독 오차로 보고 일치 처리, 원본 확인 권장)")
+        elif len(company) >= 3 and (_one_off(sender, company) or _corp_slip(sender, company)):  # 자음까지 다르면 다른 회사일 수 있음
+            add(CHECK, "이체자(보내는 분)", f"보내는 분 {transfer.get('sender')} — 회사 {ctx.get('company')}와 비슷하지만 다른 글자 있음(판독 오차 또는 다른 회사), 원본 확인")
         else:
             add(CHECK, "이체자(보내는 분)", f"보내는 분 {transfer.get('sender')} ≠ 회사 {ctx.get('company')} — 대표자 개인 계좌 등 사업주 명의가 아닌 지급인지 확인")
 
@@ -161,7 +164,9 @@ def check_month(month: str, payslip: dict, transfer: dict, ctx: dict) -> dict:
         add(MISMATCH, "실지급액·이체액", f"실지급 {net:,}원 ≠ 이체 {amount:,}원 (차이 {abs(net - amount):,}원) — 분할 지급·정정 여부 확인")
 
     t_date = str(transfer.get("date") or "")
-    if t_date and _ym(t_date) and _ym(t_date) < month:
+    if not _ym(t_date):
+        add(CHECK, "이체일", "이체일을 읽지 못함 — 원본 확인 (지급일 확인 없이 일치 처리하지 않음)")
+    elif _ym(t_date) < month:
         add(CHECK, "이체일", f"이체일 {t_date}이 귀속월({month})보다 앞섬 — 선지급 여부 확인")
 
     gross = _won(payslip.get("gross"))

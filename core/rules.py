@@ -1,7 +1,7 @@
 """이음24 규칙엔진 — '지원제도 활용 가능' 표시(배지) 판단, 공고 점검, 신청 시기 계산.
 
 판단은 전부 이 코드가 한다. AI는 결과를 설명만 하고, 여기서 정한 값을 바꾸지 못한다.
-기준: 2026년 청년일자리도약장려금 사업운영 지침 1-3항(취업애로청년) 및 기업 요건.
+기준: 2026년 청년일자리도약장려금 사업운영 지침 Ⅲ-1-3(취업애로청년) 및 기업 요건.
 지침 해석은 실무자가 원문과 대조해 확정한 것만 규칙으로 옮기고, 애매한 항목은 '확인 필요'로 둔다.
 """
 from datetime import date
@@ -9,12 +9,28 @@ from datetime import date
 from labor import MIN_WAGE, monthly_hours
 
 GUIDE = "2026 청년일자리도약장려금 지침"
-GUIDE_YOUTH = f"{GUIDE} 1-3항 (취업애로청년)"
+GUIDE_YOUTH = f"{GUIDE} Ⅲ-1-3 (취업애로청년 ❹ 국취·❺ 청년도전)"
 CAPITAL = ("서울", "경기", "인천")
 OK, CHECK, BAD, INFO = "충족", "확인 필요", "미충족", "안내"
 
-# 지원 제외 업종 (업종명 키워드). ※ 지침 원문의 제외 업종 목록과 대조해 확정·보완할 것 — 현재는 시연용 대표 사례
-EXCLUDED_INDUSTRIES = ("유흥 주점", "무도장", "사행시설")
+# 지원 제외 업종 (업종명 키워드, 띄어쓰기 무시). 2026 지침 Ⅱ-2-1·별첨 9의 소비·향락업, 청소년유해업소·풍속영업 대표 업종.
+# ※ 업종코드 대조가 아니라 이름 비교라 '해당 없음'은 자동 점검 범위에서만 — 최종 확인은 업종코드로
+EXCLUDED_INDUSTRIES = ("유흥주점", "무도유흥", "기타주점", "단란주점", "무도장", "사행시설", "카지노", "노래연습장", "비디오감상실",
+                       "복권발행", "복권판매", "경마", "경륜", "경정")
+# 2026 지침 Ⅱ-1-1: 수도권 중 인구감소지역은 비수도권으로 본다
+CAPITAL_EXCEPT = ("강화군", "옹진군", "가평군", "연천군")
+WEEKLY_MIN, WAGE_MAX = 28, 4_500_000  # 2026 지침 Ⅲ-1-4: 주 소정근로 28시간 이상, 평균 월 급여 450만원 이하
+GUIDE_HIRE = f"{GUIDE} Ⅲ-1-4 (채용 요건)"
+
+
+def excluded_industry(ind: str | None) -> str | None:
+    s = str(ind or "").replace(" ", "")
+    return next((w for w in EXCLUDED_INDUSTRIES if w in s), None)
+
+
+def min_wage_ok(monthly: float, weekly_hours, rate: int) -> bool:
+    """월급 ≥ 최저임금 × 월 환산시간 (원 단위, 반올림 여유 없음)"""
+    return monthly >= round(rate * monthly_hours(weekly_hours or 40))
 
 
 def d(s: str | None) -> date | None:
@@ -27,7 +43,10 @@ def d(s: str | None) -> date | None:
 def is_capital(region: str | None) -> bool | None:
     if not region:
         return None
-    return str(region).strip().startswith(CAPITAL)
+    r = str(region).strip()
+    if any(x in r for x in CAPITAL_EXCEPT):
+        return False
+    return r.startswith(CAPITAL)
 
 
 YOUTH_MAX, YOUTH_MAX_MIL = 34, 39  # 청년 만 15~34세, 군필자는 의무복무기간만큼 연동해 최고 만 39세 (2026 지침·사업 공고)
@@ -56,6 +75,8 @@ def history_flags(person: dict, before: date | None = None) -> dict:
     for p in person.get("programs") or []:
         if p.get("type") == "국민취업지원제도" and d(p.get("qualified")) and d(p.get("iap")) and before and d(p["qualified"]) >= before:
             flags["evidence"].append(f"국민취업지원제도 수급자격 인정({p['qualified']})이 채용일({before}) 이후 → '참여 후 취업' 아님")
+        elif p.get("type") == "국민취업지원제도" and d(p.get("iap")) and before and not p.get("iap_unknown") and d(p["iap"]) >= before:
+            flags["evidence"].append(f"취업활동계획 수립({p['iap']})이 채용일({before}) 이후 → 지침상 '참여'(인정+계획 수립) 전 채용")
         elif p.get("type") == "국민취업지원제도" and d(p.get("qualified")) and d(p.get("iap")):
             start = d(p["qualified"])
             jobs_after = [i for i in ins if d(i.get("acquired")) and d(i["acquired"]) >= start
@@ -64,7 +85,9 @@ def history_flags(person: dict, before: date | None = None) -> dict:
                 flags["evidence"].append(f"국민취업지원제도 참여 후 고용보험 취득 이력 있음({jobs_after[0]['acquired']}) → '최초 취업' 아님")
             else:
                 flags["kuchwi_first_job"] = True
-                flags["evidence"].append(f"국민취업지원제도 수급자격 인정({p['qualified']})·취업활동계획 수립({p['iap']}), 참여 후 고용보험 취득 이력 없음")
+                flags["evidence"].append(f"국민취업지원제도 수급자격 인정({p['qualified']})·취업활동계획 수립"
+                                         + (" (수립일 미입력 — 채용 전 수립 여부 확인 필요)" if p.get("iap_unknown") else f"({p['iap']})")
+                                         + ", 참여 후 고용보험 취득 이력 없음 (일경험 연계 취득 등 예외는 담당자 확인)")
         if p.get("type") == "청년도전지원사업" and d(p.get("completed")) and (before is None or d(p["completed"]) < before):
             flags["dojeon_completed"] = True
             flags["evidence"].append(f"청년도전지원사업 수료({p['completed']})")
@@ -87,13 +110,21 @@ def judge(person: dict, post: dict, consent: bool, hire: date | None = None) -> 
     base = {"badge": False, "eligible": False, "basis": GUIDE_YOUTH, "flags": flags}
     if post.get("emp_type") not in (None, "정규직"):
         return {**base, "type": "not_regular", "seeker_text": "정규직 공고가 아니라서 채용지원금 연계 대상이 아니에요."}
+    hrs, wage = post.get("weekly_hours"), post.get("wage")
+    if isinstance(hrs, (int, float)) and hrs < WEEKLY_MIN:
+        return {**base, "type": "condition_fail", "seeker_text": f"주 {hrs}시간 근무라 채용지원금 요건(주 {WEEKLY_MIN}시간 이상)에 해당하지 않아요."}
+    if isinstance(wage, (int, float)) and wage > WAGE_MAX:
+        return {**base, "type": "condition_fail", "seeker_text": "월 급여가 450만원을 넘어 채용지원금 요건(평균 월 급여 450만원 이하)에 해당하지 않아요."}
     ind = str(post.get("industry") or "")
-    if any(w in ind for w in EXCLUDED_INDUSTRIES):  # 지원 제외 업종: 채용 공고는 추천하되 지원제도 표시는 하지 않음
+    if excluded_industry(ind):  # 지원 제외 업종: 채용 공고는 추천하되 지원제도 표시는 하지 않음
         return {**base, "type": "excluded_industry", "seeker_text": "이 기업은 채용지원금 지원 제외 업종이라 연계 대상이 아니에요. 채용 공고 자체는 지원할 수 있어요."}
     if post.get("arrears") or post.get("tax_arrears"):
         return {**base, "type": "company_restricted", "seeker_text": "이 기업은 지원 제한 사유(임금체불·체납)가 확인되어 채용지원금 연계 표시를 하지 않아요."}
     if post.get("priority") is False:
         return {**base, "type": "company_not_eligible", "seeker_text": "이 기업은 우선지원대상기업이 아니어서 채용지원금 연계가 어려울 수 있어 표시하지 않아요."}
+    n = post.get("insured")
+    if isinstance(n, int) and n < 5:  # 공고 점검의 '확인 필요'와 맞춤: 기업 요건이 확인되지 않으면 배지도 달지 않는다
+        return {**base, "type": "company_check", "seeker_text": "기업 요건(기준 피보험자 수 5인 이상, 일부 업종 예외)을 확인해야 해서 표시하지 않아요."}
     if cap is False:
         text = "비수도권 기업이라 취업애로 요건 없이 청년 채용 자체로 기업이 지원을 받을 수 있어요. 기업 공고에 안내되므로 별도 표시는 필요 없어요." if youth \
             else "비수도권 기업의 청년 채용 지원 유형이지만, 청년 연령 요건은 고용센터 확인이 필요해요."
@@ -107,7 +138,8 @@ def judge(person: dict, post: dict, consent: bool, hire: date | None = None) -> 
                 "seeker_text": f"수도권 기업 유형의 취업애로청년 근거가 이력에서 확인되지 않아 표시하지 않아요 ({why}). 다른 요건 해당 여부는 고용센터에서 확인할 수 있어요."}
     kind = "국민취업지원제도 참여 후 최초 취업" if flags["kuchwi_first_job"] else "청년도전지원사업 수료"
     text = (f"이 기업이 나를 정규직으로 채용하면 '{kind}' 근거로 기업이 청년일자리도약장려금을 활용할 수 있을 것으로 예상돼요."
-            + (f" (청년 연령은 {MIL_NOTE})" if mil else "")
+            + (f" (청년 연령은 채용일 기준 예상 — {MIL_NOTE})" if mil else "")
+            + " 사전 안내이며, 기업의 사업 참여신청·나머지 요건·실제 고용유지까지 확인돼야 지원이 결정돼요."
             + ("" if consent else " 지금은 동의하지 않아 기업 화면에 표시되지 않아요."))
     return {**base, "type": "capital_eligible", "eligible": True, "badge": bool(consent), "reason": kind + (" · 군필 연령 연동" if mil else ""), "seeker_text": text}
 
@@ -128,7 +160,8 @@ def posting_check(post: dict) -> dict:
         add(CHECK, "지원 유형", "근무지역 정보가 없어 유형을 판단하지 못함")
 
     et = post.get("emp_type")
-    add(OK if et == "정규직" else BAD if et else CHECK, "고용형태", "정규직 채용" if et == "정규직" else f"'{et or '미기재'}' — 정규직 채용만 지원 대상")
+    add(OK if et == "정규직" else BAD if et else CHECK, "고용형태", "정규직 채용" if et == "정규직"
+        else f"'{et or '미기재'}' — 기간의 정함 없는 계약이 원칙 (수습 3개월 이내·기간제 후 3개월 이내 정규직 전환 등 예외는 지침 Ⅲ-3-1 확인)")
 
     pr = post.get("priority")
     add(OK if pr else CHECK, "우선지원대상기업",
@@ -140,13 +173,21 @@ def posting_check(post: dict) -> dict:
     else:
         add(OK if n >= 5 else CHECK, "피보험자 수", f"{n}명" + ("" if n >= 5 else " — 5인 미만은 일부 예외 업종만 가능하니 지침 확인"))
 
-    wage, hrs = post.get("wage"), post.get("weekly_hours") or 40
+    wage, raw_hrs = post.get("wage"), post.get("weekly_hours")
+    hrs = raw_hrs or 40
+    if isinstance(raw_hrs, (int, float)):
+        add(OK if raw_hrs >= WEEKLY_MIN else BAD, "주 소정근로시간",
+            f"주 {raw_hrs}시간" + ("" if raw_hrs >= WEEKLY_MIN else f" — 주 {WEEKLY_MIN}시간 미만은 지원 대상 아님"), GUIDE_HIRE)
+    else:
+        add(CHECK, "주 소정근로시간", f"미기재 — 주 {WEEKLY_MIN}시간 이상인지 확인", GUIDE_HIRE)
     rate = MIN_WAGE.get(date.today().year) or MIN_WAGE[max(MIN_WAGE)]
     if wage:
-        hourly = wage / monthly_hours(hrs)
-        add(OK if hourly + 0.5 >= rate else BAD, "임금(최저임금)",
-            f"월 {wage:,}원 ÷ {monthly_hours(hrs)}시간 = 시급 {hourly:,.0f}원 " + ("≥" if hourly + 0.5 >= rate else "<") + f" 최저임금 {rate:,}원",
-            "최저임금법 제6조")
+        need, ok_w = round(rate * monthly_hours(hrs)), min_wage_ok(wage, hrs, rate)
+        add(OK if ok_w else BAD, "임금(최저임금)",
+            f"월 {wage:,}원 " + ("≥" if ok_w else "<") + f" 최저 월 {need:,}원 [최저임금 {rate:,}원 × {monthly_hours(hrs)}시간]"
+            + ("" if ok_w else f" — 환산 시급 {wage / monthly_hours(hrs):,.0f}원"), "최저임금법 제6조")
+        add(OK if wage <= WAGE_MAX else BAD, "월 급여 상한",
+            f"월 {wage:,}원" + (" ≤ 450만원" if wage <= WAGE_MAX else " — 평균 월 급여 450만원 초과는 지원 대상 아님"), GUIDE_HIRE)
     else:
         add(CHECK, "임금(최저임금)", "임금 정보 없음", "최저임금법 제6조")
 
@@ -159,12 +200,13 @@ def posting_check(post: dict) -> dict:
 
     ind = str(post.get("industry") or "")
     if ind:
-        hit = next((w for w in EXCLUDED_INDUSTRIES if w in ind), None)
-        add(BAD if hit else OK, "업종", f"'{ind}' — 지원 제외 업종에 해당 (지침 원문으로 최종 확인)" if hit else f"{ind} — 제외 업종 아님",
-            f"{GUIDE} 지원 제외 업종")
+        hit = excluded_industry(ind)
+        add(BAD if hit else OK, "업종", f"'{ind}' — 지원 제외 업종에 해당 (지침 원문으로 최종 확인)" if hit
+            else f"{ind} — 자동 점검한 주요 제외 업종(유흥·사행 등)에 해당 없음, 업종코드로 최종 확인", f"{GUIDE} Ⅱ-2-1 지원 제외 업종")
 
     if post.get("tax_arrears"):
-        add(BAD, "고액·상습 체납", "국세·지방세 고액·상습 체납자 명단에 해당 — 지원 제한 대상 여부 확인", "국세청 고액·상습체납자 명단공개 (모의)")
+        add(BAD, "고액·상습 체납", "고액·상습 체납 명단(모의)에 해당 — 이음24 자체 기준으로 구직자 추천에서 제외. 지침상 제한 사유는 고용보험료 체납(Ⅱ-2-6)이므로 별도 확인",
+            "이음24 추천 기준 (국세청 고액·상습체납자 명단공개 모의)")
 
     if post.get("discrim"):
         add(CHECK, "채용 차별 소지 표현", "공고에 '" + "', '".join(post["discrim"]) + "' 표현 — 합리적 이유 없는 연령·성별 제한은 금지되므로 삭제·수정 검토",
@@ -196,5 +238,5 @@ def schedule(hire: date, today: date | None = None) -> dict:
     months = (today.year - hire.year) * 12 + today.month - hire.month - (1 if today.day < hire.day else 0)
     return {"hire_date": hire.isoformat(), "six_month_date": kept.isoformat(), "notify_date": notify.isoformat(),
             "days_left": left, "months_kept": max(months, 0),
-            "state": "신청 가능" if left <= 0 else "알림 예정" if left <= 7 else "고용유지 중",
-            "note": "채용 후 6개월 고용유지 후 신청. 신청 기한·지급 주기는 해당 연도 지침에서 확인"}
+            "state": "6개월 경과 — 1회차 지급신청 검토" if left <= 0 else "6개월 임박" if left <= 7 else "고용유지 중",
+            "note": "사업 참여신청을 마친 기업이 6개월 고용유지 후 1회차 지급신청. 지급신청 기한은 지침 Ⅲ-4-1 확인, 실제 고용유지는 담당자 확인"}

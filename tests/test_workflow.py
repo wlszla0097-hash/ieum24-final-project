@@ -75,7 +75,7 @@ def test_case_for_stored_applicant_with_demo_as_of():
     now = cases.build_case(post, app, hire, today=hire)
     later = cases.build_case(post, app, hire, today=date(2027, 4, 15))
     assert now["schedule"]["months_kept"] == 0 and later["schedule"]["months_kept"] == 6
-    assert later["schedule"]["state"] == "신청 가능"
+    assert later["schedule"]["state"].startswith("6개월 경과")
     assert later["evidence"]["open"] and "청년도전지원사업" in later["evidence"]["title"]  # 수료일이 채용일보다 앞서고 세부정보 동의
 
 
@@ -281,10 +281,52 @@ def test_swapped_reading_is_corrected_and_corp_jamo_slip():
     ctx = {"worker": "윤하람", "company": "다온물류 (가상)"}
     r = check_month("2026-04", ps, {"recipient": "김대표", "sender": "윤하람", "amount": "2030970"}, ctx)
     lv = {i["item"]: i["level"] for i in r["items"]}
-    assert lv["성명"] == "일치" and lv["이체자(보내는 분)"] == "확인 필요" and lv["판독 보정"] == "참고" and r["level"] == "확인 필요"
-    ok = check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몬류 (가상)", "amount": "2030970"}, ctx)
-    assert ok["level"] == "일치"
+    assert lv["성명"] == "일치" and lv["이체자(보내는 분)"] == "확인 필요" and lv["이체 방향"] == "확인 필요" and r["level"] == "확인 필요"
+    # 외부 검토 반영: 자음까지 다른 회사명(다운몬류)은 같은 회사로 단정하지 않음 / 모음만 다르면(다운몰류) 판독 오차로 일치
+    assert check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몬류 (가상)", "amount": "2030970", "date": "2026-05-10"}, ctx)["level"] == "확인 필요"
+    assert check_month("2026-04", ps, {"recipient": "윤하람", "sender": "다운몰류 (가상)", "amount": "2030970", "date": "2026-05-10"}, ctx)["level"] == "일치"
     f = {"media_type": "image/jpeg", "data": base64.b64encode(b"x" * 10).decode()}
     out = certificate.claimdoc({"month": "2026-04", "files": [f], "ctx": ctx, "issued_payslip": {**ps, "pay_date": "2026-05-10", "deduction": "0"},
                                 "sample_truth": {"transfer": {"recipient": "김대표", "sender": "윤하람", "amount": "2030970", "date": "2026-05-10"}}})
     assert out["transfer"]["sender"] == "김대표" and out["transfer"]["recipient"] == "윤하람"  # 화면 비교표도 바로잡힌 값
+    assert out["transfer_raw"]["sender"] == "윤하람" and out["check"]["level"] == "확인 필요"  # 원래 판독값 보존, 자동 정상 처리 안 함
+
+
+def test_review_counterexamples_do_not_pass():
+    """외부 검토(2026-10-17) 반례: 확인하지 못한 조건을 '충족·일치'로 보여 주지 않는다"""
+    import rules
+    from claimdocs import check_month
+    base = {"region": "서울 성동구", "emp_type": "정규직", "priority": True, "insured": 15, "industry": "소프트웨어 개발 및 공급업", "weekly_hours": 40}
+    v = lambda **k: rules.posting_check({**base, **k})["verdict"]  # noqa: E731
+    assert v(wage=2_900_000) == "연계 가능성 높음"
+    assert v(wage=2_156_780) == "연계 어려움"           # 최저 월 2,156,880원보다 100원 적음 (반올림 여유 없음)
+    assert v(wage=2_156_880) == "연계 가능성 높음"
+    assert v(wage=1_600_000, weekly_hours=27) == "연계 어려움"  # 주 28시간 미만
+    assert v(wage=5_000_000) == "연계 어려움"           # 월 450만원 초과
+    assert v(wage=2_900_000, industry="일반유흥주점업") == "연계 어려움" and v(wage=2_900_000, industry="기타 주점업") == "연계 어려움"
+    assert rules.is_capital("경기 가평군") is False and rules.is_capital("인천 강화군") is False and rules.is_capital("경기 성남시") is True
+    p = {"age": 26, "programs": [{"type": "청년도전지원사업", "completed": "2026-02-27"}], "insurance": []}
+    assert rules.judge(p, {**base, "wage": 2_900_000}, True)["badge"] is True
+    assert rules.judge(p, {**base, "wage": 2_900_000, "insured": 3}, True)["badge"] is False   # 배지도 기업 점검과 맞춤
+    assert rules.judge(p, {**base, "wage": 2_900_000, "weekly_hours": 20}, True)["badge"] is False
+    ctx, ps = {"worker": "서지우", "company": "다온물류 (가상)"}, {"name": "서지우", "ym": "2026-04", "net": "2030970"}
+    lv = lambda tr: check_month("2026-04", ps, tr, ctx)["level"]  # noqa: E731
+    assert lv({"recipient": "서지우", "sender": "다온유류 (가상)", "amount": "2030970", "date": "2026-05-10"}) == "확인 필요"
+    assert lv({"recipient": "다온물류 (가상)", "sender": "서지우", "amount": "2030970", "date": "2026-05-10"}) == "확인 필요"
+    assert lv({"recipient": "서지우", "sender": "다온물류 (가상)", "amount": "2030970"}) == "확인 필요"  # 이체일 없음
+
+
+def test_case_uses_real_contract_and_hides_details_without_consent():
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
+    import cases
+    from datetime import date as _d
+    post = {"id": "U-x", "company": "바른정밀(가상)", "region": "서울", "title": "개발", "emp_type": "정규직", "wage": 2_900_000,
+            "weekly_hours": 40, "priority": True, "insured": 15, "industry": "소프트웨어 개발 및 공급업"}
+    late = {"id": "A-1", "alias": "가명", "age": 26, "consent": True, "detail_consent": False,
+            "programs": [{"type": "국민취업지원제도", "qualified": "2026-07-01", "iap": "2026-07-10"}], "insurance": []}
+    c = cases.build_case(post, late, _d(2026, 4, 1), today=_d(2026, 10, 20))
+    assert c["evidence"]["open"] is False and "2026-07-01" not in str(c["evidence"])  # 근거 미확인이어도 미동의면 숨김
+    c2 = cases.build_case(post, {**late, "detail_consent": True}, _d(2026, 4, 1),
+                          contract={"employment_type": "기간제", "end_date": "2026-06-30"}, today=_d(2026, 10, 20))
+    lv = {i["item"]: i["level"] for i in c2["checklist"]}
+    assert lv["고용형태"] == "확인 필요" and "6개월 경과" in lv and any(m["item"] == "실제 고용유지" for m in c2["manual"])

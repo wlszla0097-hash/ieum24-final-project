@@ -86,7 +86,7 @@ def test_posting_check_flags():
 def test_schedule_six_months():
     s = rules.schedule(date(2026, 8, 31), today=date(2026, 10, 10))
     assert s["six_month_date"] == "2027-02-28" and s["state"] == "고용유지 중"
-    assert rules.schedule(date(2026, 3, 3), today=date(2026, 10, 10))["state"] == "신청 가능"
+    assert rules.schedule(date(2026, 3, 3), today=date(2026, 10, 10))["state"].startswith("6개월 경과")
 
 
 @pytest.mark.parametrize("text,ok", [
@@ -231,7 +231,7 @@ def test_certificate_claimdoc_without_ai_uses_sample_truth():
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
     import certificate
     img = {"media_type": "image/jpeg", "data": base64.b64encode(b"x").decode()}
-    truth = {"payslip": {"name": "김가람", "ym": "2026-05", "gross": "2600000", "net": "2300000"}, "transfer": {"recipient": "김가람", "amount": "2300000"}}
+    truth = {"payslip": {"name": "김가람", "ym": "2026-05", "gross": "2600000", "net": "2300000"}, "transfer": {"recipient": "김가람", "amount": "2300000", "date": "2026-06-10"}}
     r = certificate.claimdoc({"kind": "claimdoc", "month": "2026-05", "files": [img, img], "sample_truth": truth, "ctx": {"worker": "김가람"}})
     assert r["source"] == "synthetic_truth" and r["check"]["level"] == "일치"
     with pytest.raises(ApiError):

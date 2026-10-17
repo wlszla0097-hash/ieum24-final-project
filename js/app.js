@@ -412,7 +412,8 @@ function caseCard(c) {
       </div>
       <div><h4>확인 항목</h4>${checkList(unsigned
         ? [...c.checklist, { level: "확인 필요", item: "근로계약서 서명", detail: "근로자 서명 대기 — 체결(양측 서명) 전 계약서", basis: "근로기준법 제17조 (근로조건 명시·교부)" }]
-        : c.checklist)}</div>
+        : c.checklist)}
+        ${c.manual && c.manual.length ? `<h4>담당자 확인 항목 <small class="muted">(자동 점검하지 않음)</small></h4><ul class="manual-list">${c.manual.map((m) => `<li><b>${esc(m.item)}</b> — ${esc(m.detail)} <small class="muted">${esc(m.basis)}</small></li>`).join("")}</ul>` : ""}</div>
     </div>
     ${saved}
     ${c.hiredocs && window.IeumHireDocs ? `<div class="docs-in-case">${window.IeumHireDocs.block(c.hiredocs)}</div>` : ""}

@@ -184,8 +184,9 @@ def claimdoc(body: dict) -> dict:
     ctx = {"worker": text(ctx.get("worker"), 20), "company": text(ctx.get("company"), 40), "hire_date": text(ctx.get("hire_date"), 10), "weekly_hours": ctx.get("weekly_hours") or 40,
            "history": [{"ym": text(h.get("ym"), 7), "gross": h.get("gross")} for h in (ctx.get("history") or [])[:24] if isinstance(h, dict)],
            "prorate": _prorate(ctx.get("prorate"))}
-    tr, ctx["swapped"] = fix_swap(tr, ctx["worker"])  # 화면 비교표도 바로잡은 값으로
-    return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "source": source, "model": model, "payslip_source": "issued" if issued else source,
+    raw = dict(tr)  # 원래 판독값은 그대로 남긴다(바꿔 비교한 경우에도 담당자가 원본과 대조)
+    tr, ctx["swapped"] = fix_swap(tr, ctx["worker"])  # 비교는 바꾼 값으로 하되 '이체 방향 확인 필요'로 남김
+    return {"ok": True, "month": month, "payslip": ps, "transfer": tr, "transfer_raw": raw, "source": source, "model": model, "payslip_source": "issued" if issued else source,
             "check": check_month(month, ps, tr, ctx),
             "note": "판독값은 원본과 대조해 확인하세요. 지급 가능 여부는 판정하지 않습니다. 파일은 저장하지 않습니다."}
 
