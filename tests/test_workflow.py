@@ -224,7 +224,9 @@ def test_one_char_ocr_slips_are_not_false_alarms():
     ps = {"name": "서지우", "ym": "2026-04", "net": "2030970"}
     lv = lambda tr: {i["item"]: (i["level"], i["detail"]) for i in check_month("2026-04", ps, tr, {"worker": "서지우", "company": "다온물류 (가상)"})["items"]}  # noqa: E731
     r = lv({"recipient": "서지우", "sender": "다운물류 (가상)", "amount": "2030970", "date": "2026-05-10"})
-    assert r["이체자(보내는 분)"][0] == "일치" and "한 글자 차이" in r["이체자(보내는 분)"][1]
+    assert r["이체자(보내는 분)"][0] == "일치" and "판독 오차" in r["이체자(보내는 분)"][1]
+    assert lv({"recipient": "서지우", "sender": "다운몰류 (가상)", "amount": "2030970"})["이체자(보내는 분)"][0] == "일치"  # 실측: 모음 두 개 오독
+    assert lv({"recipient": "서지우", "sender": "다온유통", "amount": "2030970"})["이체자(보내는 분)"][0] == "확인 필요"  # 자음이 다르면 다른 회사
     assert lv({"recipient": "서지우", "sender": "김대표", "amount": "2030970"})["이체자(보내는 분)"][0] == "확인 필요"
     assert lv({"recipient": "서지운", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "확인 필요"
     assert lv({"recipient": "박서연", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"
