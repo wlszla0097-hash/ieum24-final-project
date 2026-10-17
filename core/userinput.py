@@ -184,5 +184,6 @@ def persona_to_form(p: dict) -> dict:
             f.update(kuchwi=True, kuchwi_qualified=g["qualified"], kuchwi_iap=bool(g.get("iap")),
                      kuchwi_job_after=any(d(i["acquired"]) and d(i["acquired"]) >= d(g["qualified"]) for i in p["insurance"]))
         if g["type"] == "청년도전지원사업":
-            f.update(dojeon=True, dojeon_completed=g["completed"])
+            if g.get("completed"):
+                f.update(dojeon=True, dojeon_completed=g["completed"])
     return f
