@@ -230,7 +230,7 @@ def test_certificate_claimdoc_without_ai_uses_sample_truth():
     import base64
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
     import certificate
-    img = {"media_type": "image/jpeg", "data": base64.b64encode(b"x").decode()}
+    img = {"media_type": "image/jpeg", "data": base64.b64encode(b"\xff\xd8x").decode()}
     truth = {"payslip": {"name": "김가람", "ym": "2026-05", "gross": "2600000", "net": "2300000"}, "transfer": {"recipient": "김가람", "amount": "2300000", "date": "2026-06-10"}}
     r = certificate.claimdoc({"kind": "claimdoc", "month": "2026-05", "files": [img, img], "sample_truth": truth, "ctx": {"worker": "김가람"}})
     assert r["source"] == "synthetic_truth" and r["check"]["level"] == "일치"

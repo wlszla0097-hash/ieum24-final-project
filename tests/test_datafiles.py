@@ -55,7 +55,7 @@ def test_hiredoc_reads_and_cross_checks():
     import base64
     sys.path.insert(0, str(ROOT / "api"))
     import certificate as c
-    f = {"media_type": "image/png", "data": base64.b64encode(b"x" * 10).decode()}
+    f = {"media_type": "image/png", "data": base64.b64encode(b"\x89PNG" + b"x" * 10).decode()}
     truth = {"contract": {"worker": "김하늘", "employment_type": "정규직", "start_date": "2026-03-03", "end_date": "", "base_wage": "2500000",
                           "wage_type": "월급", "weekly_hours": "40", "daily_hours": "8", "break_minutes": "30",
                           "has_holiday": True, "has_leave": True, "has_place": True, "has_job": True, "has_payday": False},

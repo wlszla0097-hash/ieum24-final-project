@@ -35,6 +35,51 @@ from rules import d  # noqa: E402
 
 TYPES = {"image/png", "image/jpeg", "image/webp", "application/pdf"}
 MAX_FILE = 3 * 1024 * 1024  # 3MB (Vercel 요청 한도 안)
+UNREADABLE = "이 파일은 AI가 읽을 수 없는 형식이에요(암호가 걸렸거나 손상된 PDF 등). 화면을 캡처한 이미지(JPG·PNG)로 올리거나, 날짜를 직접 입력해 주세요."
+
+
+def _sniff(raw: bytes) -> str | None:
+    head = raw.lstrip()[:12]
+    if head.startswith(b"%PDF"):
+        return "application/pdf"
+    if head.startswith(b"\x89PNG"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def check_file(mt: str, data: str, too_large: str = "파일이 너무 큽니다. 3MB 이하로 올려 주세요.") -> str:
+    """올린 파일을 AI에 보내기 전에 확인: 형식·크기·실제 내용(확장자만 바꾼 파일)·암호 PDF.
+    AI 서비스가 거절하면 '잠시 후 다시'처럼 보이므로, 원인을 알 수 있는 것은 여기서 먼저 안내한다."""
+    if mt not in TYPES:
+        raise ApiError(400, "invalid_input", "PNG·JPG·WEBP 이미지 또는 PDF 파일만 올릴 수 있습니다.")
+    try:
+        raw = base64.b64decode(data, validate=True)
+    except ValueError:
+        raise ApiError(400, "invalid_input", "파일을 읽지 못했습니다. 다시 선택해 주세요.")
+    if not raw:
+        raise ApiError(400, "missing_input", "빈 파일입니다. 다시 선택해 주세요.")
+    if len(raw) > MAX_FILE:
+        raise ApiError(413, "too_large", too_large)
+    real = _sniff(raw)
+    if not real or (real == "application/pdf") != (mt == "application/pdf"):
+        raise ApiError(422, "unreadable_file", "파일 내용이 확장자와 다릅니다(이름만 바꾼 파일 등). 원본 이미지나 PDF를 올려 주세요.")
+    if real == "application/pdf" and b"/Encrypt" in raw:
+        raise ApiError(422, "encrypted_pdf", "비밀번호(암호)가 걸린 PDF는 AI가 열 수 없어요. 암호를 해제한 PDF나 화면 캡처 이미지(JPG·PNG)로 올려 주세요.")
+    return real  # 이미지는 실제 형식으로 맞춰 보낸다(PNG를 JPG로 표시해 올린 경우 등)
+
+
+def ai_read(system: str, user: str, max_tokens: int, file):
+    """서류 판독 호출: AI 서비스가 파일을 거절(400)하면 일시 오류가 아니라 '읽을 수 없는 파일'로 안내"""
+    try:
+        return generate_json(system, user, max_tokens=max_tokens, file=file)
+    except ApiError as e:
+        if e.code == "ai_bad_request":
+            raise ApiError(422, "unreadable_file", UNREADABLE)
+        raise
 
 SYSTEM = """당신은 고용서비스 증빙 서류(수료증·이수증·참여확인서)를 읽는 판독 보조자입니다.
 규칙:
@@ -65,20 +110,13 @@ def read(body: dict, today: date | None = None) -> dict:
     if not body.get("consent"):
         raise ApiError(400, "need_consent", "수료증 AI 판독은 '증빙 서류 AI 판독' 동의 후 이용할 수 있습니다.")
     mt = text(body.get("media_type"), 40)
-    if mt not in TYPES:
-        raise ApiError(400, "invalid_input", "PNG·JPG·WEBP 이미지 또는 PDF 파일만 올릴 수 있습니다.")
     data = str(body.get("data") or "")
-    try:
-        size = len(base64.b64decode(data, validate=True))
-    except ValueError:
-        raise ApiError(400, "invalid_input", "파일을 읽지 못했습니다. 다시 선택해 주세요.")
-    if not size:
+    if not data:
         raise ApiError(400, "missing_input", "필수값을 입력하세요: 수료증 파일")
-    if size > MAX_FILE:
-        raise ApiError(413, "too_large", "파일이 너무 큽니다. 3MB 이하로 올려 주세요. (사진은 해상도를 줄이면 됩니다)")
+    mt = check_file(mt, data, "파일이 너무 큽니다. 3MB 이하로 올려 주세요. (사진은 해상도를 줄이면 됩니다)")
     truth = body.get("sample_truth") if isinstance(body.get("sample_truth"), dict) else None
     if provider():
-        ai = generate_json(SYSTEM, "첨부한 서류를 판독해 JSON으로 답하세요.", max_tokens=500, file={"media_type": mt, "data": data})
+        ai = ai_read(SYSTEM, "첨부한 서류를 판독해 JSON으로 답하세요.", 500, {"media_type": mt, "data": data})
         source = "ai"
     elif truth:  # 시연용 예시 서류: AI 키가 없으면 그릴 때 기록한 값으로 (다른 서류 판독과 같은 방식)
         ai, source = truth, "synthetic_truth"
@@ -156,14 +194,7 @@ def claimdoc(body: dict) -> dict:
     clean = []
     for f in files[:need]:
         mt, data = text((f or {}).get("media_type"), 40), str((f or {}).get("data") or "")
-        if mt not in TYPES:
-            raise ApiError(400, "invalid_input", "PNG·JPG·WEBP 이미지 또는 PDF 파일만 올릴 수 있습니다.")
-        try:
-            size = len(base64.b64decode(data, validate=True))
-        except ValueError:
-            raise ApiError(400, "invalid_input", "파일을 읽지 못했습니다. 다시 선택해 주세요.")
-        if not size or size > MAX_FILE:
-            raise ApiError(413, "too_large", "파일이 너무 큽니다. 두 장 합쳐 3MB 이하로 올려 주세요.")
+        mt = check_file(mt, data, "파일이 너무 큽니다. 3MB 이하로 올려 주세요.")
         clean.append({"media_type": mt, "data": data})
     if len(clean) != need:
         raise ApiError(400, "missing_input", "이체확인증을 올려 주세요." if issued else "급여명세서와 이체확인증을 함께 올려 주세요.")
@@ -171,7 +202,7 @@ def claimdoc(body: dict) -> dict:
     if provider():
         ask = (f"{month} 귀속분 이체확인증 1장만 첨부했습니다(급여명세서 없음). payslip은 모두 빈 문자열로 두고 transfer만 판독해 JSON으로 답하세요."
                if issued else f"{month} 귀속분 서류입니다. 판독해 JSON으로 답하세요.")
-        ai = generate_json(CLAIM_SYSTEM, ask, max_tokens=900, file=clean)
+        ai = ai_read(CLAIM_SYSTEM, ask, 900, clean)
         ai["transfer"] = {**(ai.get("transfer") if isinstance(ai.get("transfer"), dict) else {}), **_from_rows(ai.get("rows"))}
         source, model = "ai", model_name()
     elif truth:
@@ -217,14 +248,7 @@ def _files(body: dict, names: tuple) -> list[dict]:
         if not f:
             continue
         mt, data = text((f or {}).get("media_type"), 40), str((f or {}).get("data") or "")
-        if mt not in TYPES:
-            raise ApiError(400, "invalid_input", "PNG·JPG·WEBP 이미지 또는 PDF 파일만 올릴 수 있습니다.")
-        try:
-            size = len(base64.b64decode(data, validate=True))
-        except ValueError:
-            raise ApiError(400, "invalid_input", "파일을 읽지 못했습니다. 다시 선택해 주세요.")
-        if not size or size > MAX_FILE:
-            raise ApiError(413, "too_large", "파일이 너무 큽니다. 3MB 이하로 올려 주세요.")
+        mt = check_file(mt, data)
         out.append({"media_type": mt, "data": data, "name": name})
     return out
 
@@ -239,8 +263,8 @@ def hiredoc(body: dict) -> dict:
         raise ApiError(400, "missing_input", "근로계약서 또는 사업자등록증을 올려 주세요.")
     truth = body.get("sample_truth") if isinstance(body.get("sample_truth"), dict) else None
     if provider():
-        ai = generate_json(HIRE_SYSTEM, "채용 확정 서류입니다. 판독해 JSON으로 답하세요.", max_tokens=600,
-                           file=[{"media_type": f["media_type"], "data": f["data"]} for f in files])
+        ai = ai_read(HIRE_SYSTEM, "채용 확정 서류입니다. 판독해 JSON으로 답하세요.", 600,
+                     [{"media_type": f["media_type"], "data": f["data"]} for f in files])
         source, model = "ai", model_name()
     elif truth:
         ai, source, model = truth, "synthetic_truth", None
