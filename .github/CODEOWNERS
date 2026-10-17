@@ -1,0 +1,2 @@
+# 모든 파일의 책임자 = 팀장. 브랜치 보호에서 "Require review from Code Owners"를 켜면 팀장 승인 없이는 main에 합칠 수 없음
+* @wlszla0097-hash
