@@ -216,3 +216,16 @@ def test_portfolio_keeps_program_paragraph_masked_and_structured(monkeypatch):
     assert "■ 진로 상담" in doc and "고용서비스 프로그램 상담에서 취업 계획을" in doc  # 문단을 버리지 않고 사업명만 바꿈
     assert "국민취업" not in doc and "취업활동계획" not in doc and "300시간" not in doc
     assert "엑셀" in doc and "파이썬" not in doc and r["meta"]["guard_blocked"] == 1
+
+
+def test_one_char_ocr_slips_are_not_false_alarms():
+    """배포 실측: Haiku가 '다온물류'를 '다운물류', '박서연'을 '박시연'으로 읽음 → 회사는 일치(표시), 근로자 이름은 확인 필요, 전혀 다르면 그대로"""
+    from claimdocs import check_month
+    ps = {"name": "서지우", "ym": "2026-04", "net": "2030970"}
+    lv = lambda tr: {i["item"]: (i["level"], i["detail"]) for i in check_month("2026-04", ps, tr, {"worker": "서지우", "company": "다온물류 (가상)"})["items"]}  # noqa: E731
+    r = lv({"recipient": "서지우", "sender": "다운물류 (가상)", "amount": "2030970", "date": "2026-05-10"})
+    assert r["이체자(보내는 분)"][0] == "일치" and "한 글자 차이" in r["이체자(보내는 분)"][1]
+    assert lv({"recipient": "서지우", "sender": "김대표", "amount": "2030970"})["이체자(보내는 분)"][0] == "확인 필요"
+    assert lv({"recipient": "서지운", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "확인 필요"
+    assert lv({"recipient": "박서연", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"
+    assert lv({"recipient": "허지우", "sender": "다온물류", "amount": "2030970"})["성명"][0] == "불일치"  # 성이 다르면 다른 사람
