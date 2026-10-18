@@ -291,7 +291,8 @@ details.consent-log ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted
 .pf-add { background: var(--warn-bg); color: var(--warn); border-bottom: 2px solid var(--warn); padding: 0 2px; border-radius: 3px; }
 .pf-puff { color: var(--bad); text-decoration: underline wavy var(--bad); text-underline-offset: 3px; }
 .pf-review .ok { color: var(--ok); }
-.pf-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0 10px; }
+.pf-check { display: flex !important; flex-direction: row; justify-content: flex-start; text-align: left; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0 10px; }
+.pf-check input { width: auto; margin: 0; flex: none; }
 ul.points { margin: 6px 0; padding-left: 18px; font-size: 13.5px; }
 details.pf { padding: 6px 10px; margin: 4px 0 6px; font-size: 13.5px; }
 details.pf pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; color: var(--text); }

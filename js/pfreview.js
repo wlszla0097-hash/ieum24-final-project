@@ -23,9 +23,9 @@
   /** 낱말 하나가 '원문에 없는 명사'인지 (동사·흔한 말·원문 낱말은 false) */
   function novelNoun(word, src) {
     let w = word.replace(/[^0-9A-Za-z가-힣·]/g, "").replace(/·/g, "");
-    if (w.length < 2 || /^[0-9]+$/.test(w)) return false;
+    if (w.length < 2 || /^[0-9]+$/.test(w) || COMMON_NOUN.has(w)) return false;
     // 꾸미는 말·동사형(다룬, 익힌, 수행하는, 정해진, 없이)은 먼저 걸러 낸다
-    if (/(하는|되는|하던|했던|하며|하고|하여|해서|하게|하기|없이|있는|있던)$/.test(w)) return false;
+    if (/(하는|되는|하던|했던|하며|하고|하여|해서|하게|하기|없이|있는|있던|어질|아질|될|할)$/.test(w)) return false;
     const last = w.charCodeAt(w.length - 1) - 0xac00;
     if (w.length <= 4 && last >= 0 && last < 11172 && last % 28 === 4 && !/(반|산|안|원|전|건|선|권|본|분|문|순|간|단|관|면)$/.test(w)) return false;  // 받침 ㄴ으로 끝나는 꾸미는 말(다룬·익힌·세운)
     let hadJosa = false;
