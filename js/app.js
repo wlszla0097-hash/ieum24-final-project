@@ -285,7 +285,7 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     <div class="pf-actions"><button class="btn ghost" id="pfAi" type="button">AI 초안 만들기</button><span class="muted" id="pfMsg"></span></div>
     <div class="pf-review" id="pfReview" hidden></div>
     <textarea id="pfText" rows="10" maxlength="4000" placeholder="직접 작성하거나 [AI 초안 만들기]를 누르세요.">${esc(state.portfolio || "")}</textarea>
-    <label class="pf-check" id="pfCheckWrap" hidden><input type="checkbox" id="pfChecked"> <span>표시된 부분을 내 경험과 대조해 확인하고, 필요한 곳은 고쳤어요</span></label>
+    <label class="pf-check" id="pfCheckWrap" hidden><input type="checkbox" id="pfChecked"> <span>표시된 부분을 내 경험과 대조해 확인하고, 필요한 곳은 고쳤어요 <small class="muted">— 색 표시는 검토용이에요. [포트폴리오 저장]을 누르면 표시 없이 기본 글꼴로 저장돼요.</small></span></label>
     <button class="btn primary block" id="pfSave" type="button">포트폴리오 저장</button>`;
   /* AI 초안 검토 표시: 내 경험에 없는 말·과장 표현에 색을 입혀 그 부분부터 확인하게 한다 (최종 내용은 본인이 정함) */
   const pfSource = () => { const f = readSeekForm(); return [f.job, f.experience, ...(state.points || [])].join("\n"); };
@@ -328,7 +328,9 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     state.portfolio = $("#pfText").value.trim();
     if (state.profile) state.profile.portfolio = state.portfolio;
     try { if (window.IeumFlow) await window.IeumFlow.saveSeeker(); } catch (err) { return toast(esc(err.message)); }
-    toast(state.portfolio ? "포트폴리오를 저장했어요. 지원한 기업 화면에서 핵심 포인트와 함께 보입니다." : "포트폴리오를 비웠어요.");
+    // 저장되는 것은 입력 칸의 글(색·표시 없는 기본 글꼴)뿐 → 검토 표시는 닫는다
+    pfFromAi = state.portfolioFromAi = false; pfRender();
+    toast(state.portfolio ? "포트폴리오를 저장했어요(색 표시 없이 기본 글꼴). 지원한 기업 화면에서 핵심 포인트와 함께 보입니다." : "포트폴리오를 비웠어요.");
   });
   $$(".apply", $("#seekResult")).forEach((b) => b.addEventListener("click", async () => {
     const job = state.jobs.find((j) => j.id === b.dataset.id);
