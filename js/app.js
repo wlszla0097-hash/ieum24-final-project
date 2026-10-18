@@ -283,8 +283,27 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
     <h3>📄 내 포트폴리오</h3>
     <p class="muted">위에서 정리된 활동으로 AI가 초안을 한 번만 만들고, 직접 고쳐서 등록합니다. 기업은 <b>핵심 포인트</b>를 먼저 보고, 필요할 때만 전체를 펼칩니다. 참여 사업명은 기업 화면에서 자동으로 가려집니다.</p>
     <div class="pf-actions"><button class="btn ghost" id="pfAi" type="button">AI 초안 만들기</button><span class="muted" id="pfMsg"></span></div>
+    <div class="pf-review" id="pfReview" hidden></div>
     <textarea id="pfText" rows="10" maxlength="4000" placeholder="직접 작성하거나 [AI 초안 만들기]를 누르세요.">${esc(state.portfolio || "")}</textarea>
+    <label class="pf-check" id="pfCheckWrap" hidden><input type="checkbox" id="pfChecked"> <span>표시된 부분을 내 경험과 대조해 확인하고, 필요한 곳은 고쳤어요 <small class="muted">— 색 표시는 검토용이에요. [포트폴리오 저장]을 누르면 표시 없이 기본 글꼴로 저장돼요.</small></span></label>
     <button class="btn primary block" id="pfSave" type="button">포트폴리오 저장</button>`;
+  /* AI 초안 검토 표시: 내 경험에 없는 말·과장 표현에 색을 입혀 그 부분부터 확인하게 한다 (최종 내용은 본인이 정함) */
+  const pfSource = () => { const f = readSeekForm(); return [f.job, f.experience, ...(state.points || [])].join("\n"); };
+  let pfFromAi = !!state.portfolioFromAi, pfTimer = null;
+  const pfRender = () => {
+    const box = $("#pfReview"), text = $("#pfText").value;
+    if (!pfFromAi || !text.trim() || !window.IeumReview) { box.hidden = true; $("#pfCheckWrap").hidden = true; state.pfFlags = 0; return; }
+    const r = window.IeumReview.mark(text, pfSource());
+    state.pfFlags = r.total;
+    box.hidden = false;
+    box.innerHTML = `<div class="legend"><b>AI 초안 검토 도우미</b>`
+      + (r.total ? `<span><span class="pf-add">노란 표시</span> 내 경험에 없는 말 ${r.added}문장</span><span><span class="pf-puff">빨간 물결</span> 과장·단정 표현 ${r.puff}문장</span>`
+        : `<span class="ok">표시할 곳이 없어요. 그래도 한 번 읽어 보세요.</span>`)
+      + `<span>아래 칸에서 고치면 바로 다시 표시돼요</span></div>${r.html}`;
+    $("#pfCheckWrap").hidden = !r.total;
+  };
+  $("#pfText").addEventListener("input", () => { clearTimeout(pfTimer); pfTimer = setTimeout(pfRender, 300); });
+  pfRender();
   $("#pfAi").addEventListener("click", async () => {
     const b = $("#pfAi"), m = $("#pfMsg"), body = readSeekForm();
     if (!body.agree_ai) return (m.textContent = "AI 처리 동의(4번 두 번째 항목)가 필요해요. 직접 작성해도 됩니다.");
@@ -294,15 +313,24 @@ function renderSeeker({ activities, competencies, resume_intro, jobs, programs, 
       const r = await api("/api/seeker", { method: "POST", body: { ...body, action: "portfolio" } });
       logAI("포트폴리오 초안", body, t0, { model: r.meta.model, ai_used: true, guard_blocked: r.meta.guard_blocked, result: { portfolio: r.portfolio } });
       $("#pfText").value = r.portfolio;
+      pfFromAi = state.portfolioFromAi = true; $("#pfChecked").checked = false; pfRender();
       const rm = r.meta.removed || {};
-      m.textContent = `초안 완료 · ${r.meta.chars ?? r.portfolio.length}자 · 원문에 없는 내용 차단 ${r.meta.guard_blocked}건 · 중복 ${rm.duplicate ?? 0}·과장 표현 ${rm.puffery ?? 0}·원문에 없는 기술명 ${rm.unknown_term ?? 0}문장 제외 · 고친 뒤 등록하세요.`;
+      m.textContent = `초안 완료 · ${r.meta.chars ?? r.portfolio.length}자 · 원문에 없는 내용 차단 ${r.meta.guard_blocked}건 · 중복 ${rm.duplicate ?? 0}·과장 표현 ${rm.puffery ?? 0}·원문에 없는 기술명 ${rm.unknown_term ?? 0}문장 제외 · 색으로 표시된 부분부터 확인하고 고친 뒤 저장하세요.`;
     } catch (err) { logAI("포트폴리오 초안", body, t0, { ai_used: false, error: err.message }); m.textContent = err.message; } finally { b.disabled = false; }
   });
   $("#pfSave").addEventListener("click", async () => {
+    if (pfFromAi) pfRender();
+    if (pfFromAi && state.pfFlags && !$("#pfChecked").checked) {
+      $("#pfMsg").textContent = `표시된 ${state.pfFlags}곳을 내 경험과 대조해 확인한 뒤, 아래 확인 칸을 체크하고 저장하세요.`;
+      $("#pfCheckWrap").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     state.portfolio = $("#pfText").value.trim();
     if (state.profile) state.profile.portfolio = state.portfolio;
     try { if (window.IeumFlow) await window.IeumFlow.saveSeeker(); } catch (err) { return toast(esc(err.message)); }
-    toast(state.portfolio ? "포트폴리오를 저장했어요. 지원한 기업 화면에서 핵심 포인트와 함께 보입니다." : "포트폴리오를 비웠어요.");
+    // 저장되는 것은 입력 칸의 글(색·표시 없는 기본 글꼴)뿐 → 검토 표시는 닫는다
+    pfFromAi = state.portfolioFromAi = false; pfRender();
+    toast(state.portfolio ? "포트폴리오를 저장했어요(색 표시 없이 기본 글꼴). 지원한 기업 화면에서 핵심 포인트와 함께 보입니다." : "포트폴리오를 비웠어요.");
   });
   $$(".apply", $("#seekResult")).forEach((b) => b.addEventListener("click", async () => {
     const job = state.jobs.find((j) => j.id === b.dataset.id);

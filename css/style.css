@@ -286,6 +286,13 @@ details.consent-log ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted
 .pf-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
 .pf-actions .btn { padding: 8px 14px; font-size: 14px; }
 #pfText { margin-top: 6px; }
+.pf-review { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; background: var(--surface); font-size: 14.5px; line-height: 1.75; }
+.pf-review .legend { font-size: 13px; color: var(--muted); margin-bottom: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+.pf-add { background: var(--warn-bg); color: var(--warn); border-bottom: 2px solid var(--warn); padding: 0 2px; border-radius: 3px; }
+.pf-puff { color: var(--bad); text-decoration: underline wavy var(--bad); text-underline-offset: 3px; }
+.pf-review .ok { color: var(--ok); }
+.pf-check { display: flex !important; flex-direction: row; justify-content: flex-start; text-align: left; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0 10px; }
+.pf-check input { width: auto; margin: 0; flex: none; }
 ul.points { margin: 6px 0; padding-left: 18px; font-size: 13.5px; }
 details.pf { padding: 6px 10px; margin: 4px 0 6px; font-size: 13.5px; }
 details.pf pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; color: var(--text); }

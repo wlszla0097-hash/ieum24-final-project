@@ -625,3 +625,61 @@ def test_cert_sample_uses_loaded_seeker_date(app):
     pg.click("#certBtn"); pg.wait_for_selector("#certResult .cert-read", timeout=20000)
     assert pg.input_value("#kuchwi_qualified") == "2025-11-03"
     assert not pg.errors, pg.errors
+
+
+def test_portfolio_review_marks_unsupported_words_and_needs_check(app):
+    """AI 초안 검토 도우미: 내 경험에 없는 말·과장 표현에 색 표시 → 확인 체크 전에는 저장 안 됨 (최종 결정은 사용자)"""
+    pg = app
+    fake = {"ok": True, "meta": {"model": "test", "guard_blocked": 0, "chars": 100, "removed": {}},
+            "portfolio": "사무 직무를 준비하는 신입 지원자\n\n■ 경험\n• 사무 실무 — 엑셀로 문서를 작성했습니다. 거래처 전표 확인과 서류 편철 업무를 맡았습니다. 실무 중심의 역량을 갖추었습니다."}
+
+    def handle(route):
+        body = json.loads(route.request.post_data or "{}")
+        if body.get("action") == "portfolio":
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(fake, ensure_ascii=False))
+        else:
+            route.continue_()
+    pg.route("**/api/seeker", handle)
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.select_option("#seekExample", "P-B01"); pg.fill("#s_alias", "서지우")
+    pg.check("#seekForm [name=agree_privacy]"); pg.check("#seekForm [name=agree_ai]")
+    pg.click("#seekBtn"); pg.wait_for_selector("#pfAi", timeout=30000)
+    pg.click("#pfAi"); pg.wait_for_selector("#pfReview:not([hidden]) mark.pf-add")
+    marked = pg.eval_on_selector_all("#pfReview mark.pf-add", "els => els.map(e => e.textContent)")
+    assert any("전표" in m for m in marked) and any("편철" in m for m in marked)
+    assert pg.locator("#pfReview > span.pf-puff").count() == 1  # 과장 문장 (안내 문구의 견본 표시는 제외)
+    assert not any("엑셀" in m for m in marked)  # 원문에 있는 말은 표시 안 함
+    pg.click("#pfSave")
+    assert "확인 칸을 체크" in pg.inner_text("#pfMsg")  # 체크 전 저장 막힘
+    pg.fill("#pfText", "사무 직무를 준비하는 신입 지원자\n\n■ 경험\n• 사무 실무 — 엑셀로 문서를 작성했습니다.")
+    pg.wait_for_function("document.querySelector('#pfCheckWrap').hidden")  # 고치면 표시 사라짐 → 바로 저장 가능
+    pg.click("#pfSave"); pg.wait_for_selector(".toast >> text=포트폴리오를 저장했어요")
+    assert not pg.errors, pg.errors
+
+
+def test_portfolio_saved_without_review_marks(app):
+    """검토 표시를 체크하고 그대로 저장해도, 저장본은 표시 없는 글(기본 글꼴) — 구직자 저장값·기업 화면 모두"""
+    pg = app
+    fake = {"ok": True, "meta": {"model": "test", "guard_blocked": 0, "chars": 80, "removed": {}},
+            "portfolio": "사무 직무를 준비하는 신입 지원자\n\n■ 경험\n• 사무 실무 — 거래처 전표 확인과 서류 편철 업무를 맡았습니다. 실무 중심의 역량을 갖추었습니다."}
+    pg.route("**/api/seeker", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(fake, ensure_ascii=False))
+             if json.loads(r.request.post_data or "{}").get("action") == "portfolio" else r.continue_())
+    pg.goto(pg.base + "/#seeker")
+    pg.wait_for_function("document.querySelectorAll('#seekExample option').length > 1")
+    pg.select_option("#seekExample", "P-B01"); pg.fill("#s_alias", "서지우")
+    pg.check("#seekForm [name=agree_privacy]"); pg.check("#seekForm [name=agree_ai]"); pg.check("#seekForm [name=consent]")
+    pg.click("#seekBtn"); pg.wait_for_selector("#pfAi", timeout=30000)
+    pg.click("#pfAi"); pg.wait_for_selector("#pfReview:not([hidden]) mark.pf-add")
+    assert "기본 글꼴로 저장" in pg.inner_text("#pfCheckWrap")
+    pg.check("#pfChecked"); pg.click("#pfSave"); pg.wait_for_selector(".toast >> text=기본 글꼴")
+    assert pg.is_hidden("#pfReview")  # 저장 뒤 검토 표시 닫힘
+    saved = stored(pg, "seekers")[0]["portfolio"]
+    assert "전표" in saved and "<mark" not in saved and "pf-" not in saved  # 글만 저장
+    jid = pg.eval_on_selector_all("#seekResult .apply", "els => els.map(e => e.dataset.id)")[0]
+    pg.click(f"#seekResult .apply[data-id='{jid}']")
+    pg.wait_for_function(f"document.querySelector(\"#seekResult .apply[data-id='{jid}']\").textContent.includes('지원 완료')")
+    open_company(pg, company_key_for(pg, jid)); pg.click("[data-etab=list]")
+    pg.wait_for_selector("#postDetail .applicant.me details.pf", timeout=20000)
+    assert pg.locator("#postDetail mark, #postDetail .pf-add, #postDetail .pf-puff").count() == 0  # 기업 화면도 표시 없음
+    assert not pg.errors, pg.errors
