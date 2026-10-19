@@ -356,3 +356,33 @@ def test_uploaded_file_errors_are_explained_not_retry():
         assert e.value.status == 422 and "읽을 수 없는" in str(e.value)
     finally:
         certificate.generate_json = orig
+
+
+def test_portfolio_allows_three_sentences_per_section(monkeypatch):
+    """분량 완화: 활동 본문 3문장·summary/fit 3문장까지 살린다 (중복·과장 필터는 그대로)"""
+    import seeker
+    ai_out = {"headline": "React로 화면을 만들어 본 신입 웹 개발 지원자",
+              "summary": "웹 개발 과정을 수료했습니다. 지역 축제 안내 사이트를 팀으로 만들었습니다. 개인 시간에는 깃허브 정리도 했습니다.",
+              "strengths": ["메인 화면 담당"],
+              "sections": [{"title": "축제 안내 웹사이트", "body": "4명이 한 팀이 되어 사이트를 만들었습니다. 저는 첫 화면을 맡았습니다. 화면 구성은 React로 작성했습니다."}],
+              "fit": "배운 HTML과 CSS로 정적 화면을 구성할 수 있습니다. 팀 작업에서 맡은 몫을 끝낸 경험이 있습니다. 화면 개발 업무에서 이 경험을 쓸 수 있습니다.", "skills": ["React"]}
+    monkeypatch.setattr(seeker, "generate_json", lambda *a, **k: ai_out)
+    r = seeker.portfolio({"ai_consent": True, "desire": {"job": "웹 개발"}, "points": [],
+                          "experience": "- 웹 개발 과정 수료 (HTML, CSS, React)\n- 팀 프로젝트: 축제 안내 웹사이트, 4명 팀, 메인 화면 담당\n- 깃허브 정리"})
+    doc = r["portfolio"]
+    assert "화면 구성은 React로 작성했습니다." in doc and "개인 시간에는 깃허브 정리도 했습니다." in doc  # 3번째 문장까지 유지
+    assert "화면 개발 업무에서 이 경험을 쓸 수 있습니다." in doc
+    assert r["meta"]["section_count"] == 1 and r["meta"]["strength_count"] == 1
+
+
+def test_portfolio_keeps_section_when_summary_repeats_it(monkeypatch):
+    """요약과 활동 설명이 같은 말이면 경험 문단이 아니라 요약 쪽을 줄인다 (실측: 가장 중요한 훈련 경험이 통째로 사라졌음)"""
+    import seeker
+    same = "사무행정 실무 과정 160시간에서 엑셀, 문서 작성, 전산회계 기초를 배웠습니다."
+    ai_out = {"headline": "사무행정을 배운 신입 지원자", "summary": same, "strengths": [], "fit": "",
+              "sections": [{"title": "사무행정 실무 과정", "body": same}], "skills": ["엑셀"]}
+    monkeypatch.setattr(seeker, "generate_json", lambda *a, **k: ai_out)
+    r = seeker.portfolio({"ai_consent": True, "desire": {"job": "사무"}, "points": [],
+                          "experience": "- 사무행정 실무 (엑셀·문서 작성·전산회계 기초) 160시간"})
+    doc = r["portfolio"]
+    assert f"• 사무행정 실무 과정 — {same}" in doc and doc.count("160시간") == 1 and r["meta"]["section_count"] == 1
