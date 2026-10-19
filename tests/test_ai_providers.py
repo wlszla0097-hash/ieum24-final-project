@@ -107,3 +107,14 @@ def test_openai_gateway_without_json_option_retries(fake, monkeypatch):
     _SRV[0].reject_format = True  # JSON 응답 옵션을 거절하는 중계 서버 흉내
     assert ai.generate_json("s", "u") == {"ok": "openai"}
     assert "response_format" in seen[-2]["body"] and "response_format" not in seen[-1]["body"]
+
+
+def test_openai_gateway_json_option_rejected_only_once(fake, monkeypatch):
+    """교육용 게이트웨이처럼 JSON 옵션을 거절하면, 두 번째 호출부터는 처음부터 옵션 없이 1번만 보낸다."""
+    url, seen = fake
+    monkeypatch.setenv("OPENAI_API_KEY", "k"); monkeypatch.setenv("OPENAI_BASE_URL", url)
+    _SRV[0].reject_format = True
+    assert ai.generate_json("s", "u") == {"ok": "openai"}
+    n = len(seen)
+    assert ai.generate_json("s", "u") == {"ok": "openai"}
+    assert len(seen) == n + 1 and "response_format" not in seen[-1]["body"]

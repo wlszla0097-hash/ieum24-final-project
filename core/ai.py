@@ -47,6 +47,9 @@ def base_url(p: str | None = None) -> str:
     return base[:-3] if p != "gemini" and base.endswith("/v1") else base
 
 
+_NO_JSON_OPTION: set = set()  # JSON 응답 옵션(response_format)을 거절한 OpenAI 호환 주소 — 같은 서버 실행 동안 기억
+
+
 def _post(url: str, headers: dict, body: dict) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"content-type": "application/json", **headers}, method="POST")
     try:
@@ -88,18 +91,24 @@ def generate_json(system: str, user: str, max_tokens: int = 1500, file: dict | l
                      "messages": [{"role": "user", "content": _claude_content(user, files)}]})
         out = "".join(b.get("text", "") for b in res.get("content", []))
     elif p == "openai":
-        body = {"model": model_name(), "messages": [{"role": "system", "content": system}, {"role": "user", "content": _openai_content(user, files)}],
-                "response_format": {"type": "json_object"}}
+        url = f"{base_url(p)}/v1/chat/completions"
+        body = {"model": model_name(), "messages": [{"role": "system", "content": system}, {"role": "user", "content": _openai_content(user, files)}]}
+        if url not in _NO_JSON_OPTION:
+            body["response_format"] = {"type": "json_object"}
         # 최신 모델(gpt-5·o 계열)은 max_completion_tokens 만 받고 temperature 조절을 막는다
         body.update({"max_completion_tokens": max_tokens} if _openai_new(model_name()) else {"max_tokens": max_tokens, "temperature": 0.2})
-        url, auth = f"{base_url(p)}/v1/chat/completions", {"authorization": f"Bearer {_key('OPENAI_API_KEY')}"}
+        auth = {"authorization": f"Bearer {_key('OPENAI_API_KEY')}"}
         try:
             res = _post(url, auth, body)
         except ApiError as e:
-            if e.code != "ai_bad_request":
+            if e.code != "ai_bad_request" or "response_format" not in body:
                 raise
-            body.pop("response_format", None)  # 중계 서버가 JSON 응답 옵션을 모르면 옵션 없이 한 번 더 (지시문으로 JSON 요청)
+            # 중계 서버(교육용 게이트웨이 등)가 JSON 응답 옵션을 지원하지 않으면 옵션 없이 한 번 더 보내고(지시문으로 JSON 요청),
+            # 이 주소는 기억해 두었다가 다음 호출부터는 처음부터 옵션 없이 보낸다 → 매번 2번 호출되던 문제 해결
+            print("[ai] 이 주소는 JSON 응답 옵션을 지원하지 않아 옵션 없이 다시 보냅니다(다음 호출부터는 바로 옵션 없이).")
+            body.pop("response_format", None)
             res = _post(url, auth, body)
+            _NO_JSON_OPTION.add(url)
         choices = res.get("choices") or []
         msg = (choices[0].get("message") or {}) if choices else {}
         c = msg.get("content")
