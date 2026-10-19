@@ -126,7 +126,6 @@ python3 tools/make_seals.py      # 회사별 시연용 가상 법인 인장 PNG 
 
 - 기능 요구 명세서·비기능 요구사항·AI 활용 명세·아키텍처·일정: [docs/requirements.md](docs/requirements.md)
 - 발표 자료(PDF·PPT): [docs/presentation/](docs/presentation/) · [이음24_발표자료.pdf](docs/presentation/이음24_발표자료.pdf)
-- 발표 대본(10분)·예상 질문: [docs/presentation-script.md](docs/presentation-script.md)
 
 ## 출처
 
