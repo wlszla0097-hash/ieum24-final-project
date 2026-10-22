@@ -112,8 +112,8 @@
 
 | 담당 | 파일 | id |
 |---|---|---|
-| 지수 | `data/synthetic/seekers_A.json` | P-A01, P-A02 … |
-| 홍주 | `data/synthetic/seekers_B.json` | P-B01, P-B02 … |
+| 팀원 A | `data/synthetic/seekers_A.json` | P-A01, P-A02 … |
+| 팀원 B | `data/synthetic/seekers_B.json` | P-B01, P-B02 … |
 | (기존 예시) | `data/synthetic/seekers.json` | 수정하지 않음 |
 
 - 파일은 `[]`(빈 목록)로 만들어 두었습니다. `[ ]` 안에 아래 형식의 `{ … }`를 쉼표로 이어 넣으면 됩니다.

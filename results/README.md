@@ -5,8 +5,8 @@
 
 | 담당 | 내보내기 파일 | 비교 기록 |
 |---|---|---|
-| 지수 | `results/export_A.json` | `results/모델비교_A.md` |
-| 홍주 | `results/export_B.json` | `results/모델비교_B.md` |
+| 팀원 A | `results/export_A.json` | `results/모델비교_A.md` |
+| 팀원 B | `results/export_B.json` | `results/모델비교_B.md` |
 
 ## 1. 내보내기 (개발 서버를 끄기 전에!)
 
@@ -14,7 +14,7 @@
 
 1. 구직자 화면 → **📥 내 서류함** → **[📤 테스트 결과 내보내기(JSON)]** (기업 화면의 [저장 데이터 내보내기(JSON)]도 같은 파일)
 2. 다운로드 폴더에 `ieum24-test-<모델이름>-<날짜>.json` 이 생김
-3. 이 폴더로 옮기고 이름을 `export_A.json`(홍주님 `export_B.json`)으로 바꾸기
+3. 이 폴더로 옮기고 이름을 `export_A.json`(팀원 B `export_B.json`)으로 바꾸기
 
 파일에 들어가는 것: 구직자(이력·역량 문장·포트폴리오), 지원 기록, **AI 테스트 기록**(호출마다 모델 이름·응답 시간·차단 수·결과 문장·추천 공고), 사용한 AI 모델.
 API 키 값은 들어가지 않습니다.
