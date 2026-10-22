@@ -1,4 +1,4 @@
-# AI 비교 기록 — 홍주 (모델: Claude Sonnet 4.6)
+# AI 비교 기록 — 팀원 B (모델: Claude Sonnet 4.6)
 
 - 테스트일: 2026-10-16
 - 게이트웨이: `ANTHROPIC_BASE_URL`(교육용 중계 서버, copa.codyssey.kr)
